@@ -10,6 +10,20 @@ export const GAME_STATES = {
   GAME_OVER: 'game_over'
 };
 
+// Turn-based States
+export const TURN_STATES = {
+  PLAYER_TURN: 'player_turn',
+  ENEMY_TURN: 'enemy_turn',
+  TRANSITION: 'transition'
+};
+
+// Attack Phases
+export const ATTACK_PHASES = {
+  PREPARATION: 'preparation',    // Visual warning, enemy glows
+  EXECUTION: 'execution',       // Attack happens
+  RECOVERY: 'recovery'          // Brief pause after attack
+};
+
 // Attack Types & Defense Actions
 export const ATTACK_TYPES = {
   NORMAL: 'normal',    // Requires dodge (right button)
@@ -21,6 +35,13 @@ export const DEFENSE_ACTIONS = {
   NONE: 'none',
   DODGE: 'dodge',      // Right button
   PARRY: 'parry'       // Left button
+};
+
+// Player Turn Actions
+export const PLAYER_ACTIONS = {
+  HEAL: 'heal',        // Restore health
+  ATTACK: 'attack',    // Attack an enemy
+  DEFEND: 'defend'     // Defensive stance for next turn
 };
 
 // ============================================================================
@@ -50,10 +71,20 @@ export const COLORS = {
   ENEMY_DEFAULT: 0xD3D3D3,
   ENEMY_VARIANTS: [0xD3D3D3, 0xD3D3D3, 0xD3D3D3, 0xD3D3D3],
   
-  // Attack Highlight Colors
+  // Attack Phase Colors
+  ATTACK_PREPARATION: 0xffd93d,  // Yellow during preparation
+  ATTACK_EXECUTION: 0xff6b6b,   // Red during execution
+  ATTACK_RECOVERY: 0x96ceb4,    // Green during recovery
+  
+  // Attack Type Colors
   ATTACK_NORMAL: 0xffd93d,  // Yellow for dodge
   ATTACK_HEAVY: 0x45b7d1,   // Blue for parry
-  ATTACK_FEINT: 0xff6b6b    // Red for feint
+  ATTACK_FEINT: 0xff6b6b,   // Red for feint
+  
+  // Player Turn Colors
+  PLAYER_HEAL: 0x96ceb4,    // Green for heal
+  PLAYER_ATTACK: 0xff6b6b,  // Red for attack
+  PLAYER_DEFEND: 0x45b7d1   // Blue for defend
 };
 
 // Button Configuration
@@ -121,7 +152,14 @@ export const PLAYER_CONFIG = {
   GEOMETRY: 'box', // box, sphere, cone
   ANIMATION: {
     IDLE_SPEED: 1.0,
-    HOVER_AMPLITUDE: 0.2
+    HOVER_AMPLITUDE: 0.2,
+    HEAL_GLOW_INTENSITY: 0.8,
+    ATTACK_PULSE_SPEED: 4.0
+  },
+  ACTIONS: {
+    HEAL_AMOUNT: 25,
+    ATTACK_DAMAGE: 30,
+    DEFEND_REDUCTION: 0.5  // 50% damage reduction
   }
 };
 
@@ -130,19 +168,23 @@ export const ENEMY_CONFIG = {
   MAX_COUNT: 3,
   SPAWN_RADIUS: 5,
   SIZE: 1.5,
+  HEALTH: 100,
   COLORS: [0xD3D3D3, 0xD3D3D3, 0xD3D3D3, 0xD3D3D3],
   GEOMETRIES: ['sphere', 'sphere', 'sphere'], // can be sphere, box, cone
   ANIMATION: {
     ROTATION_SPEED: 0.5,
     HOVER_SPEED: 2.0,
     HOVER_AMPLITUDE: 0.3,
-    ATTACK_PULSE_SPEED: 8.0,
-    ATTACK_PULSE_AMPLITUDE: 0.1,
-    ATTACK_MOVE_DISTANCE: 0.5
+    PREPARATION_PULSE_SPEED: 3.0,
+    PREPARATION_SCALE_AMPLITUDE: 0.2,
+    EXECUTION_SCALE: 1.3,
+    RECOVERY_FADE_SPEED: 2.0
   },
   MATERIALS: {
     EMISSIVE_INTENSITY_DEFAULT: 0.2,
-    EMISSIVE_INTENSITY_ATTACKING: 0.5,
+    EMISSIVE_INTENSITY_PREPARATION: 0.6,
+    EMISSIVE_INTENSITY_EXECUTION: 1.0,
+    EMISSIVE_INTENSITY_RECOVERY: 0.1,
     SHININESS: 100
   }
 };
@@ -155,14 +197,18 @@ export const ENEMY_CONFIG = {
 export const TIMING_CONFIG = {
   TARGET_FPS: 60,
   
+  // Turn-based Timing
+  TURN_TRANSITION_DURATION: 1000,
+  PLAYER_TURN_DURATION: 5000,  // 5 seconds to choose action
+  
+  // Attack Phase Timing
+  ATTACK_PREPARATION_DURATION: 2000,  // 2 seconds warning
+  ATTACK_EXECUTION_DURATION: 500,     // 0.5 seconds attack window
+  ATTACK_RECOVERY_DURATION: 1000,     // 1 second recovery
+  
   // Action Windows (in milliseconds)
   PERFECT_WINDOW: 100,      // Perfect timing window
   GOOD_WINDOW: 250,         // Good timing window
-  TOTAL_ACTION_WINDOW: 4000, // Total time player has to react
-  
-  // Attack Timing
-  ATTACK_TELEGRAPH: 2000,   // Warning time before attack
-  COMBO_TIMEOUT: 800,       // Time between attacks in combo
   
   // Round Timing
   ROUND_START_DELAY: 1000,
@@ -181,16 +227,78 @@ export const SCORE_CONFIG = {
   MISS_PENALTY: 0,
   WRONG_ACTION_PENALTY: 0,
   ROUND_COMPLETION_BONUS: 50,
-  COMBO_MULTIPLIER: 1.1  // 10% bonus per combo hit
+  COMBO_MULTIPLIER: 1.1,  // 10% bonus per combo hit
+  PLAYER_ATTACK_BONUS: 25,
+  HEAL_BONUS: 10
 };
 
 // Health System
 export const HEALTH_CONFIG = {
   MAX_HEALTH: 100,
-  DAMAGE_ON_MISS: 10,
-  DAMAGE_ON_WRONG_ACTION: 5,
-  HEALING_PER_PERFECT: 0, // Can be used for difficulty balancing
-  CRITICAL_HEALTH_THRESHOLD: 20 // For UI warnings
+  DAMAGE_ON_MISS: 20,
+  DAMAGE_ON_WRONG_ACTION: 10,
+  HEALING_PER_PERFECT: 0,
+  CRITICAL_HEALTH_THRESHOLD: 20,
+  ENEMY_ATTACK_DAMAGE: {
+    NORMAL: 15,
+    HEAVY: 25,
+    FEINT: 5  // Feint does small damage if not avoided
+  }
+};
+
+// ============================================================================
+// ATTACK SEQUENCES CONFIGURATION
+// ============================================================================
+
+// Predefined Attack Sequences
+export const ATTACK_SEQUENCES = {
+  TUTORIAL: {
+    name: "Tutorial Sequence",
+    attacks: [
+      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
+      { enemyId: 1, type: ATTACK_TYPES.HEAVY, delay: 0 },
+      { enemyId: 2, type: ATTACK_TYPES.FEINT, delay: 0 }
+    ]
+  },
+  
+  BASIC_COMBO: {
+    name: "Basic Combo",
+    attacks: [
+      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
+      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 500 },
+      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 1000 }
+    ]
+  },
+  
+  MIXED_ASSAULT: {
+    name: "Mixed Assault",
+    attacks: [
+      { enemyId: 0, type: ATTACK_TYPES.FEINT, delay: 0 },
+      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 300 },
+      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 600 },
+      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 1200 }
+    ]
+  },
+  
+  ADVANCED_PATTERN: {
+    name: "Advanced Pattern",
+    attacks: [
+      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
+      { enemyId: 1, type: ATTACK_TYPES.FEINT, delay: 200 },
+      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 400 },
+      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 800 },
+      { enemyId: 0, type: ATTACK_TYPES.HEAVY, delay: 1000 }
+    ]
+  }
+};
+
+// Round-based sequence selection
+export const ROUND_SEQUENCES = {
+  1: 'TUTORIAL',
+  2: 'BASIC_COMBO',
+  3: 'MIXED_ASSAULT',
+  4: 'ADVANCED_PATTERN',
+  // Round 5+ uses random selection from all patterns
 };
 
 // ============================================================================
@@ -200,33 +308,16 @@ export const HEALTH_CONFIG = {
 // Difficulty Progression
 export const DIFFICULTY_CONFIG = {
   ROUND_SCALING: {
-    ATTACK_COUNT_BASE: 3,
-    ATTACK_COUNT_INCREASE_PER_ROUND: 1,
-    MAX_ATTACKS_PER_ROUND: 8,
-    SPEED_INCREASE_PER_ROUND: 0.05,
-    MAX_SPEED_MULTIPLIER: 2.0
+    SPEED_INCREASE_PER_ROUND: 0.1,
+    MAX_SPEED_MULTIPLIER: 2.0,
+    DAMAGE_INCREASE_PER_ROUND: 2,
+    ENEMY_HEALTH_INCREASE: 10
   },
   
   ENEMY_SCALING: {
-    NEW_ENEMY_EVERY_N_ROUNDS: 3,
+    NEW_ENEMY_EVERY_N_ROUNDS: 5,
     MAX_ACTIVE_ENEMIES: 3
   }
-};
-
-// Predefined Attack Sequences
-export const ATTACK_SEQUENCES = {
-  TUTORIAL: [
-    { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
-    { enemyId: 1, type: ATTACK_TYPES.HEAVY, delay: 3000 },
-    { enemyId: 2, type: ATTACK_TYPES.FEINT, delay: 6000 }
-  ],
-  
-  BASIC: [
-    { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
-    { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 2000 },
-    { enemyId: 1, type: ATTACK_TYPES.HEAVY, delay: 4000 },
-    { enemyId: 2, type: ATTACK_TYPES.NORMAL, delay: 6000 }
-  ]
 };
 
 // ============================================================================
@@ -239,10 +330,14 @@ export const AUDIO_CONFIG = {
   MUSIC_VOLUME: 0.5,
   
   SOUNDS: {
-    ATTACK_WARNING: 'attack_warning.wav',
+    ATTACK_PREPARATION: 'attack_preparation.wav',
+    ATTACK_EXECUTION: 'attack_execution.wav',
     PERFECT_HIT: 'perfect_hit.wav',
     GOOD_HIT: 'good_hit.wav',
     MISS: 'miss.wav',
+    PLAYER_HEAL: 'player_heal.wav',
+    PLAYER_ATTACK: 'player_attack.wav',
+    TURN_TRANSITION: 'turn_transition.wav',
     GAME_OVER: 'game_over.wav'
   }
 };
@@ -257,6 +352,20 @@ export const UI_CONFIG = {
     HEALTH_BAR_HEIGHT: 8,
     SCORE_FONT_SIZE: 24,
     COMBO_FONT_SIZE: 18
+  },
+  
+  TURN_INDICATOR: {
+    FONT_SIZE: 28,
+    POSITION: 'top-center',
+    BACKGROUND_OPACITY: 0.8
+  },
+  
+  ACTION_BUTTONS: {
+    SIZE: 80,
+    MARGIN: 15,
+    HEAL_COLOR: '#96ceb4',
+    ATTACK_COLOR: '#ff6b6b',
+    DEFEND_COLOR: '#45b7d1'
   },
   
   RESULT_MESSAGE: {
@@ -281,7 +390,9 @@ export const DEBUG_CONFIG = {
   LOG_FRAME_COUNT: 60, // Log every N frames
   SHOW_FPS: __DEV__ || false,
   SHOW_WIREFRAMES: false,
-  ENABLE_STATS: __DEV__ || false
+  ENABLE_STATS: __DEV__ || false,
+  LOG_ATTACK_PHASES: true,
+  LOG_TURN_CHANGES: true
 };
 
 // ============================================================================
@@ -295,8 +406,7 @@ export const GAME_CONFIG = {
   PLAYER: PLAYER_CONFIG,
   ENEMIES: ENEMY_CONFIG,
   TIMING: TIMING_CONFIG,
-  SCORE: SCORE_CONFIG,
-  ATTACK_SEQUENCE_1: ATTACK_SEQUENCES.BASIC
+  SCORE: SCORE_CONFIG
 };
 
 export const TIMING = TIMING_CONFIG;
