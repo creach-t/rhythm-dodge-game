@@ -1,0 +1,92 @@
+// Configuration du jeu
+export const GAME_CONFIG = {
+  // Écran et rendu
+  CANVAS_WIDTH: 800,
+  CANVAS_HEIGHT: 600,
+  TARGET_FPS: 60,
+  
+  // Caméra 3D
+  CAMERA: {
+    FOV: 75,
+    NEAR: 0.1,
+    FAR: 1000,
+    POSITION: { x: 0, y: 8, z: 10 },
+    LOOK_AT: { x: 0, y: 0, z: 0 }
+  },
+  
+  // Joueur
+  PLAYER: {
+    POSITION: { x: 0, y: 0, z: 0 },
+    HEALTH: 100,
+    SIZE: 1
+  },
+  
+  // Ennemis
+  ENEMIES: {
+    MAX_COUNT: 3,
+    SPAWN_RADIUS: 6,
+    SIZE: 1.2,
+    COLORS: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffd93d']
+  },
+  
+  // Système de timing
+  TIMING: {
+    PERFECT_WINDOW: 100,    // ms pour timing parfait
+    GOOD_WINDOW: 250,       // ms pour bon timing
+    ATTACK_TELEGRAPH: 1000, // ms avant l'attaque
+    COMBO_TIMEOUT: 2000     // ms timeout entre attaques
+  },
+  
+  // Types d'attaques
+  ATTACK_TYPES: {
+    NORMAL: 'normal',    // Nécessite esquive (bouton droite)
+    HEAVY: 'heavy',      // Nécessite parade (bouton gauche)
+    FEINT: 'feint'       // Aucune action requise
+  },
+  
+  // Actions défensives
+  DEFENSE_ACTIONS: {
+    NONE: 'none',
+    DODGE: 'dodge',      // Bouton droite
+    PARRY: 'parry'       // Bouton gauche
+  },
+  
+  // Score
+  SCORE: {
+    PERFECT_HIT: 100,
+    GOOD_HIT: 50,
+    MISS_PENALTY: -25,
+    WRONG_ACTION_PENALTY: -50
+  }
+};
+
+// Couleurs du thème
+export const COLORS = {
+  BACKGROUND: '#1a1a1a',
+  PRIMARY: '#4ecdc4',
+  SECONDARY: '#45b7d1',
+  SUCCESS: '#96ceb4',
+  WARNING: '#ffd93d',
+  DANGER: '#ff6b6b',
+  TEXT: '#ffffff',
+  TEXT_SECONDARY: '#cccccc',
+  UI_BACKGROUND: '#2a2a2a',
+  UI_BORDER: '#404040'
+};
+
+// Configuration des boutons
+export const BUTTON_CONFIG = {
+  SIZE: 80,
+  MARGIN: 20,
+  BORDER_RADIUS: 40,
+  ACTIVE_SCALE: 0.9,
+  FEEDBACK_DURATION: 150
+};
+
+// États du jeu
+export const GAME_STATES = {
+  MENU: 'menu',
+  PLAYING: 'playing',
+  PAUSED: 'paused',
+  GAME_OVER: 'game_over'
+};
