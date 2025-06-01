@@ -1,31 +1,31 @@
 // Configuration du jeu
 export const GAME_CONFIG = {
   // Écran et rendu
-  CANVAS_WIDTH: 800,
-  CANVAS_HEIGHT: 600,
+  CANVAS_WIDTH: 400,
+  CANVAS_HEIGHT: 800,
   TARGET_FPS: 60,
   
-  // Caméra 3D
+  // Caméra 3D - Ajustée pour vue portrait
   CAMERA: {
-    FOV: 75,
+    FOV: 60,
     NEAR: 0.1,
     FAR: 1000,
-    POSITION: { x: 0, y: 8, z: 10 },
+    POSITION: { x: 0, y: 12, z: 8 },  // Plus éloignée et plus haute
     LOOK_AT: { x: 0, y: 0, z: 0 }
   },
   
   // Joueur
   PLAYER: {
-    POSITION: { x: 0, y: 0, z: 0 },
+    POSITION: { x: 0, y: 0, z: 2 },  // Légèrement vers l'avant
     HEALTH: 100,
-    SIZE: 1
+    SIZE: 1.2
   },
   
-  // Ennemis
+  // Ennemis - Repositionnés pour être plus visibles
   ENEMIES: {
     MAX_COUNT: 3,
-    SPAWN_RADIUS: 6,
-    SIZE: 1.2,
+    SPAWN_RADIUS: 5,  // Plus près du joueur
+    SIZE: 1.5,        // Plus gros
     COLORS: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffd93d']
   },
   
@@ -74,11 +74,11 @@ export const COLORS = {
   UI_BORDER: '#404040'
 };
 
-// Configuration des boutons
+// Configuration des boutons - Ajustée pour portrait
 export const BUTTON_CONFIG = {
-  SIZE: 80,
-  MARGIN: 20,
-  BORDER_RADIUS: 40,
+  SIZE: 90,
+  MARGIN: 30,
+  BORDER_RADIUS: 45,
   ACTIVE_SCALE: 0.9,
   FEEDBACK_DURATION: 150
 };
