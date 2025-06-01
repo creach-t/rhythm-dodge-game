@@ -5,7 +5,6 @@ import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import GameUI from './GameUI';
 import { GAME_CONFIG, DEFENSE_ACTIONS, GAME_STATES } from '../utils/Constants';
-import GameEngine from '../engine/GameEngine';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -17,11 +16,19 @@ const GameScreen = () => {
     combo: 0
   });
 
-  const gameEngineRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
   const cameraRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const enemiesRef = useRef([]);
+
+  // État du jeu simplifié
+  const gameLogicRef = useRef({
+    currentRound: 1,
+    awaitingAction: false,
+    expectedAction: null,
+    attackStartTime: 0
+  });
 
   // Initialisation de la scène 3D
   const initializeScene = async (gl) => {
@@ -76,16 +83,13 @@ const GameScreen = () => {
         console.log(`Child ${index}:`, child.type, child.name || 'unnamed', child.position);
       });
 
-      // Initialiser le moteur de jeu
-      gameEngineRef.current = new GameEngine({
-        scene,
-        camera,
-        renderer,
-        onGameStateChange: handleGameStateChange
-      });
-
       // Démarrer la boucle de rendu
       startRenderLoop();
+
+      // Démarrer le gameplay simple après 2 secondes
+      setTimeout(() => {
+        startSimpleGameplay();
+      }, 2000);
       
       console.log('Scene initialized successfully');
     } catch (error) {
@@ -190,6 +194,7 @@ const GameScreen = () => {
     try {
       const enemyColors = [0xff6b6b, 0x96ceb4, 0x45b7d1];
       const angleStep = (Math.PI * 2) / GAME_CONFIG.ENEMIES.MAX_COUNT;
+      const enemies = [];
 
       for (let i = 0; i < GAME_CONFIG.ENEMIES.MAX_COUNT; i++) {
         let geometry;
@@ -211,7 +216,7 @@ const GameScreen = () => {
         
         const material = new THREE.MeshBasicMaterial({ 
           color: enemyColors[i],
-          transparent: false,  // Pas de transparence pour plus de visibilité
+          transparent: false,
           opacity: 1.0
         });
         
@@ -236,13 +241,113 @@ const GameScreen = () => {
         };
         
         scene.add(enemy);
+        enemies.push(enemy);
         console.log(`Enemy ${i} created at position:`, enemy.position, 'color:', enemyColors[i].toString(16));
       }
       
+      enemiesRef.current = enemies;
       console.log('All enemies created successfully');
     } catch (error) {
       console.error('Error creating enemies:', error);
     }
+  };
+
+  const startSimpleGameplay = () => {
+    console.log('Starting simple gameplay...');
+    
+    // Démarrer une attaque simple après 1 seconde
+    setTimeout(() => {
+      triggerRandomAttack();
+    }, 1000);
+  };
+
+  const triggerRandomAttack = () => {
+    if (gameLogicRef.current.awaitingAction) return;
+    
+    try {
+      const enemyId = Math.floor(Math.random() * GAME_CONFIG.ENEMIES.MAX_COUNT);
+      const attackTypes = ['normal', 'heavy', 'feint'];
+      const attackType = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+      
+      console.log(`Triggering ${attackType} attack from enemy ${enemyId}`);
+      
+      const enemy = enemiesRef.current[enemyId];
+      if (enemy) {
+        // Changer la couleur pour indiquer l'attaque
+        let highlightColor;
+        switch (attackType) {
+          case 'normal':
+            highlightColor = 0xffd93d; // Jaune pour esquive
+            gameLogicRef.current.expectedAction = DEFENSE_ACTIONS.DODGE;
+            break;
+          case 'heavy':
+            highlightColor = 0x45b7d1; // Bleu pour parade
+            gameLogicRef.current.expectedAction = DEFENSE_ACTIONS.PARRY;
+            break;
+          case 'feint':
+            highlightColor = 0xff6b6b; // Rouge pour ne rien faire
+            gameLogicRef.current.expectedAction = DEFENSE_ACTIONS.NONE;
+            break;
+          default:
+            highlightColor = enemy.userData.originalColor;
+        }
+        
+        enemy.material.color.setHex(highlightColor);
+        enemy.userData.isAttacking = true;
+        enemy.userData.attackType = attackType;
+        
+        gameLogicRef.current.awaitingAction = true;
+        gameLogicRef.current.attackStartTime = Date.now();
+        
+        console.log(`Attack highlighted! Expected action: ${gameLogicRef.current.expectedAction}`);
+        
+        // Timeout après 3 secondes
+        setTimeout(() => {
+          if (gameLogicRef.current.awaitingAction) {
+            handleMissedAction();
+          }
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Error triggering attack:', error);
+    }
+  };
+
+  const handleMissedAction = () => {
+    console.log('Player missed the action!');
+    resetAttackState();
+    updateScore(-25);
+    
+    // Programmer la prochaine attaque
+    setTimeout(() => {
+      triggerRandomAttack();
+    }, 2000);
+  };
+
+  const resetAttackState = () => {
+    try {
+      // Remettre tous les ennemis à leur couleur originale
+      enemiesRef.current.forEach(enemy => {
+        if (enemy && enemy.userData) {
+          enemy.material.color.setHex(enemy.userData.originalColor);
+          enemy.userData.isAttacking = false;
+          enemy.userData.attackType = null;
+        }
+      });
+      
+      gameLogicRef.current.awaitingAction = false;
+      gameLogicRef.current.expectedAction = null;
+    } catch (error) {
+      console.error('Error resetting attack state:', error);
+    }
+  };
+
+  const updateScore = (points) => {
+    setGameState(prevState => ({
+      ...prevState,
+      score: Math.max(0, prevState.score + points),
+      combo: points > 0 ? prevState.combo + 1 : 0
+    }));
   };
 
   const startRenderLoop = () => {
@@ -250,11 +355,6 @@ const GameScreen = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
       
       try {
-        // Mettre à jour le moteur de jeu
-        if (gameEngineRef.current) {
-          gameEngineRef.current.update();
-        }
-        
         // Animation basique des ennemis
         animateEnemies();
         
@@ -276,13 +376,12 @@ const GameScreen = () => {
   };
 
   const animateEnemies = () => {
-    if (!sceneRef.current) return;
+    if (enemiesRef.current.length === 0) return;
     
     try {
       const time = Date.now() * 0.001;
       
-      for (let i = 0; i < GAME_CONFIG.ENEMIES.MAX_COUNT; i++) {
-        const enemy = sceneRef.current.getObjectByName(`enemy_${i}`);
+      enemiesRef.current.forEach((enemy, i) => {
         if (enemy) {
           // Rotation lente
           enemy.rotation.y = time * 0.5 + i;
@@ -291,28 +390,59 @@ const GameScreen = () => {
           enemy.position.y = GAME_CONFIG.ENEMIES.SIZE * 0.8 + 
                             Math.sin(time * 2 + i) * 0.3;
         }
-      }
+      });
     } catch (error) {
       console.error('Error animating enemies:', error);
     }
   };
 
-  const handleGameStateChange = (newState) => {
-    setGameState(newState);
-  };
-
   const handleDodge = () => {
     console.log('Dodge button pressed');
-    if (gameEngineRef.current && gameState.state === GAME_STATES.PLAYING) {
-      gameEngineRef.current.handlePlayerAction(DEFENSE_ACTIONS.DODGE);
+    if (gameLogicRef.current.awaitingAction) {
+      handlePlayerAction(DEFENSE_ACTIONS.DODGE);
     }
   };
 
   const handleParry = () => {
     console.log('Parry button pressed');
-    if (gameEngineRef.current && gameState.state === GAME_STATES.PLAYING) {
-      gameEngineRef.current.handlePlayerAction(DEFENSE_ACTIONS.PARRY);
+    if (gameLogicRef.current.awaitingAction) {
+      handlePlayerAction(DEFENSE_ACTIONS.PARRY);
     }
+  };
+
+  const handlePlayerAction = (action) => {
+    if (!gameLogicRef.current.awaitingAction) return;
+    
+    console.log(`Player action: ${action}, expected: ${gameLogicRef.current.expectedAction}`);
+    
+    const isCorrect = action === gameLogicRef.current.expectedAction;
+    const timeTaken = Date.now() - gameLogicRef.current.attackStartTime;
+    
+    let points = 0;
+    let message = '';
+    
+    if (isCorrect) {
+      if (timeTaken < 1000) {
+        points = 100;
+        message = 'PARFAIT!';
+      } else {
+        points = 50;
+        message = 'Bien!';
+      }
+    } else {
+      points = -50;
+      message = 'Mauvaise action!';
+    }
+    
+    console.log(`Action result: ${message} (${points} points)`);
+    
+    resetAttackState();
+    updateScore(points);
+    
+    // Programmer la prochaine attaque
+    setTimeout(() => {
+      triggerRandomAttack();
+    }, 1500);
   };
 
   // Nettoyage à la destruction du composant
@@ -320,9 +450,6 @@ const GameScreen = () => {
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
-      }
-      if (gameEngineRef.current) {
-        gameEngineRef.current.destroy();
       }
     };
   }, []);
