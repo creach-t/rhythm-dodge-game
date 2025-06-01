@@ -5,6 +5,8 @@
     "version": "1.0.0",
     "orientation": "landscape",
     "userInterfaceStyle": "dark",
+    "scheme": "rhythm-dodge-game",
+    "platforms": ["ios", "android", "web"],
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#1a1a1a"
@@ -23,7 +25,11 @@
       "orientationLock": "landscape"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static"
+    },
+    "experiments": {
+      "typedRoutes": false
     }
   }
 }
