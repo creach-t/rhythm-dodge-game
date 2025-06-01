@@ -5,15 +5,24 @@ import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import GameUI from './GameUI';
 import { GAME_CONFIG, GAME_STATES } from '../utils/Constants';
+import { 
+  setupScene, 
+  setupCamera, 
+  setupLighting, 
+  createGround, 
+  createGrid, 
+  createPlayer 
+} from '../engine/SceneSetup';
+import { 
+  createEnemy, 
+  animateEnemies, 
+  highlightEnemyAttack, 
+  resetEnemyAppearance,
+  DEFENSE_ACTIONS 
+} from '../systems/EnemySystem';
+import { GameLogic } from '../systems/GameLogic';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-// Définir DEFENSE_ACTIONS directement ici
-const DEFENSE_ACTIONS = {
-  NONE: 'none',
-  DODGE: 'dodge',
-  PARRY: 'parry'
-};
 
 const GameScreen = () => {
   const [gameState, setGameState] = useState({
@@ -28,279 +37,107 @@ const GameScreen = () => {
   const cameraRef = useRef(null);
   const animationFrameRef = useRef(null);
   const enemiesRef = useRef([]);
-
-  // État du jeu simplifié
-  const gameLogicRef = useRef({
-    currentRound: 1,
-    awaitingAction: false,
-    expectedAction: null,
-    attackStartTime: 0
-  });
+  const gameLogic = useRef(new GameLogic());
 
   // Initialisation de la scène 3D
   const initializeScene = async (gl) => {
     try {
       console.log('Initializing 3D scene...');
-      console.log('Screen dimensions:', screenWidth, 'x', screenHeight);
       
+      // Créer le renderer
       const renderer = new Renderer({ gl });
       renderer.setSize(screenWidth, screenHeight);
       renderer.setClearColor(0x1a1a1a, 1.0);
       rendererRef.current = renderer;
 
-      // Créer la scène
-      const scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(0x1a1a1a, 20, 50); // Ajouter du brouillard pour la profondeur
+      // Créer la scène et la caméra
+      const scene = setupScene();
+      const camera = setupCamera(screenWidth, screenHeight);
+      
       sceneRef.current = scene;
-
-      // Créer la caméra avec aspect ratio portrait
-      const camera = new THREE.PerspectiveCamera(
-        GAME_CONFIG.CAMERA.FOV,
-        screenWidth / screenHeight,
-        GAME_CONFIG.CAMERA.NEAR,
-        GAME_CONFIG.CAMERA.FAR
-      );
-      
-      camera.position.set(
-        GAME_CONFIG.CAMERA.POSITION.x,
-        GAME_CONFIG.CAMERA.POSITION.y,
-        GAME_CONFIG.CAMERA.POSITION.z
-      );
-      
-      camera.lookAt(
-        new THREE.Vector3(
-          GAME_CONFIG.CAMERA.LOOK_AT.x,
-          GAME_CONFIG.CAMERA.LOOK_AT.y,
-          GAME_CONFIG.CAMERA.LOOK_AT.z
-        )
-      );
-      
       cameraRef.current = camera;
-      console.log('Camera position:', camera.position);
-      console.log('Camera aspect:', camera.aspect);
 
       // Ajouter l'éclairage
       setupLighting(scene);
 
-      // Créer les objets de base
-      createGameObjects(scene);
+      // Créer les objets de la scène
+      scene.add(createGround());
+      scene.add(createGrid());
+      scene.add(createPlayer());
 
-      // Debug: Afficher le nombre d'objets dans la scène
-      console.log('Scene children count:', scene.children.length);
-      scene.children.forEach((child, index) => {
-        console.log(`Child ${index}:`, child.type, child.name || 'unnamed', child.position);
-      });
+      // Créer les ennemis
+      const enemies = [];
+      for (let i = 0; i < GAME_CONFIG.ENEMIES.MAX_COUNT; i++) {
+        const enemy = createEnemy(i, GAME_CONFIG.ENEMIES.MAX_COUNT, GAME_CONFIG.ENEMIES.SPAWN_RADIUS);
+        scene.add(enemy);
+        enemies.push(enemy);
+      }
+      enemiesRef.current = enemies;
+
+      console.log('Scene initialized with', scene.children.length, 'objects');
 
       // Démarrer la boucle de rendu
       startRenderLoop();
 
-      // Démarrer le gameplay simple après 2 secondes
-      setTimeout(() => {
-        startSimpleGameplay();
-      }, 2000);
+      // Démarrer le gameplay
+      setTimeout(() => startGameplay(), 2000);
       
-      console.log('Scene initialized successfully');
     } catch (error) {
       console.error('Error initializing scene:', error);
     }
   };
 
-  const setupLighting = (scene) => {
-    try {
-      // Lumière ambiante plus forte pour voir les objets
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-      scene.add(ambientLight);
-
-      // Lumière directionnelle principale
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(5, 10, 5);
-      directionalLight.castShadow = true;
-      scene.add(directionalLight);
-
-      // Lumière d'appoint
-      const fillLight = new THREE.DirectionalLight(0x4ecdc4, 0.4);
-      fillLight.position.set(-5, 5, -5);
-      scene.add(fillLight);
+  const startRenderLoop = () => {
+    const animate = () => {
+      animationFrameRef.current = requestAnimationFrame(animate);
       
-      console.log('Lighting setup complete');
-    } catch (error) {
-      console.error('Error setting up lighting:', error);
-    }
-  };
-
-  const createGameObjects = (scene) => {
-    try {
-      // Sol/Arène plus grand
-      const groundGeometry = new THREE.CircleGeometry(15, 32);
-      const groundMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x333333,
-        emissive: 0x111111,
-        shininess: 10
-      });
-      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.y = -0.1;
-      ground.receiveShadow = true;
-      ground.name = 'ground';
-      scene.add(ground);
-
-      // Grille de référence plus visible
-      const gridSize = 20;
-      const gridDivisions = 20;
-      const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x666666, 0x444444);
-      gridHelper.position.y = 0.01;
-      scene.add(gridHelper);
-
-      // Joueur (cube bleu au centre) - Plus grand et plus visible
-      const playerGeometry = new THREE.BoxGeometry(
-        GAME_CONFIG.PLAYER.SIZE,
-        GAME_CONFIG.PLAYER.SIZE * 1.5,
-        GAME_CONFIG.PLAYER.SIZE
-      );
-      const playerMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0x4ecdc4,
-        emissive: 0x2a7a7a,
-        shininess: 100
-      });
-      const player = new THREE.Mesh(playerGeometry, playerMaterial);
-      player.position.set(
-        GAME_CONFIG.PLAYER.POSITION.x,
-        GAME_CONFIG.PLAYER.SIZE * 0.75,
-        GAME_CONFIG.PLAYER.POSITION.z
-      );
-      player.castShadow = true;
-      player.name = 'player';
-      scene.add(player);
-      console.log('Player created at position:', player.position);
-
-      // Ennemis (formes géométriques temporaires)
-      createEnemies(scene);
-      
-      console.log('Game objects created successfully');
-    } catch (error) {
-      console.error('Error creating game objects:', error);
-    }
-  };
-
-  const createEnemies = (scene) => {
-    try {
-      const enemyColors = [0xff6b6b, 0x96ceb4, 0x45b7d1];
-      const angleStep = (Math.PI * 2) / GAME_CONFIG.ENEMIES.MAX_COUNT;
-      const enemies = [];
-
-      for (let i = 0; i < GAME_CONFIG.ENEMIES.MAX_COUNT; i++) {
-        let geometry;
+      try {
+        const time = Date.now() * 0.001;
         
-        // Créer différentes géométries pour chaque ennemi - Plus grosses
-        switch (i) {
-          case 0:
-            geometry = new THREE.ConeGeometry(1.2, 3.0, 8);
-            break;
-          case 1:
-            geometry = new THREE.SphereGeometry(1.5, 12, 8);
-            break;
-          case 2:
-            geometry = new THREE.CylinderGeometry(1.2, 1.2, 2.5, 12);
-            break;
-          default:
-            geometry = new THREE.BoxGeometry(2, 2, 2);
+        // Animer les ennemis
+        if (enemiesRef.current.length > 0) {
+          animateEnemies(enemiesRef.current, time);
         }
         
-        // Utiliser MeshPhongMaterial pour une meilleure visibilité
-        const material = new THREE.MeshPhongMaterial({ 
-          color: enemyColors[i],
-          emissive: enemyColors[i],
-          emissiveIntensity: 0.2,
-          shininess: 100
-        });
+        // Rendu de la scène
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+          rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
         
-        const enemy = new THREE.Mesh(geometry, material);
-        
-        // Positionner en arc de cercle face au joueur - Plus proches
-        const angle = angleStep * i - Math.PI / 2;
-        const radius = GAME_CONFIG.ENEMIES.SPAWN_RADIUS;
-        
-        enemy.position.set(
-          Math.cos(angle) * radius,
-          GAME_CONFIG.ENEMIES.SIZE * 0.8,
-          Math.sin(angle) * radius
-        );
-        
-        enemy.castShadow = true;
-        enemy.name = `enemy_${i}`;
-        enemy.userData = { 
-          id: i, 
-          isAttacking: false, 
-          attackType: null,
-          originalColor: enemyColors[i]
-        };
-        
-        scene.add(enemy);
-        enemies.push(enemy);
-        console.log(`Enemy ${i} created at position:`, enemy.position, 'color:', enemyColors[i].toString(16));
+        // Forcer le rendu GL pour Expo
+        const gl = rendererRef.current?.getContext();
+        if (gl && gl.endFrameEXP) {
+          gl.endFrameEXP();
+        }
+      } catch (error) {
+        console.error('Error in render loop:', error);
       }
-      
-      enemiesRef.current = enemies;
-      console.log('All enemies created successfully');
-    } catch (error) {
-      console.error('Error creating enemies:', error);
-    }
+    };
+    
+    animate();
   };
 
-  const startSimpleGameplay = () => {
-    console.log('Starting simple gameplay...');
-    
-    // Démarrer une attaque simple après 1 seconde
-    setTimeout(() => {
-      triggerRandomAttack();
-    }, 1000);
+  const startGameplay = () => {
+    console.log('Starting gameplay...');
+    setTimeout(() => triggerRandomAttack(), 1000);
   };
 
   const triggerRandomAttack = () => {
-    if (gameLogicRef.current.awaitingAction) return;
+    if (gameLogic.current.awaitingAction) return;
     
     try {
       const enemyId = Math.floor(Math.random() * GAME_CONFIG.ENEMIES.MAX_COUNT);
-      const attackTypes = ['normal', 'heavy', 'feint'];
-      const attackType = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+      const attackType = gameLogic.current.getRandomAttack();
       
-      console.log(`Triggering ${attackType} attack from enemy ${enemyId}`);
+      console.log(`Enemy ${enemyId} attacks with ${attackType}`);
       
       const enemy = enemiesRef.current[enemyId];
-      if (enemy) {
-        // Changer la couleur et l'émission pour indiquer l'attaque
-        let highlightColor;
-        switch (attackType) {
-          case 'normal':
-            highlightColor = 0xffd93d; // Jaune pour esquive
-            gameLogicRef.current.expectedAction = DEFENSE_ACTIONS.DODGE;
-            break;
-          case 'heavy':
-            highlightColor = 0x45b7d1; // Bleu pour parade
-            gameLogicRef.current.expectedAction = DEFENSE_ACTIONS.PARRY;
-            break;
-          case 'feint':
-            highlightColor = 0xff6b6b; // Rouge pour ne rien faire
-            gameLogicRef.current.expectedAction = DEFENSE_ACTIONS.NONE;
-            break;
-          default:
-            highlightColor = enemy.userData.originalColor;
-        }
-        
-        enemy.material.color.setHex(highlightColor);
-        enemy.material.emissive.setHex(highlightColor);
-        enemy.material.emissiveIntensity = 0.5;
-        enemy.userData.isAttacking = true;
-        enemy.userData.attackType = attackType;
-        
-        gameLogicRef.current.awaitingAction = true;
-        gameLogicRef.current.attackStartTime = Date.now();
-        
-        console.log(`Attack highlighted! Expected action: ${gameLogicRef.current.expectedAction}`);
+      if (enemy && gameLogic.current.triggerAttack(enemyId, attackType)) {
+        highlightEnemyAttack(enemy, attackType);
         
         // Timeout après 3 secondes
         setTimeout(() => {
-          if (gameLogicRef.current.awaitingAction) {
+          if (gameLogic.current.awaitingAction) {
             handleMissedAction();
           }
         }, 3000);
@@ -312,33 +149,15 @@ const GameScreen = () => {
 
   const handleMissedAction = () => {
     console.log('Player missed the action!');
-    resetAttackState();
+    resetAllEnemies();
     updateScore(-25);
+    gameLogic.current.reset();
     
-    // Programmer la prochaine attaque
-    setTimeout(() => {
-      triggerRandomAttack();
-    }, 2000);
+    setTimeout(() => triggerRandomAttack(), 2000);
   };
 
-  const resetAttackState = () => {
-    try {
-      // Remettre tous les ennemis à leur couleur originale
-      enemiesRef.current.forEach(enemy => {
-        if (enemy && enemy.userData) {
-          enemy.material.color.setHex(enemy.userData.originalColor);
-          enemy.material.emissive.setHex(enemy.userData.originalColor);
-          enemy.material.emissiveIntensity = 0.2;
-          enemy.userData.isAttacking = false;
-          enemy.userData.attackType = null;
-        }
-      });
-      
-      gameLogicRef.current.awaitingAction = false;
-      gameLogicRef.current.expectedAction = null;
-    } catch (error) {
-      console.error('Error resetting attack state:', error);
-    }
+  const resetAllEnemies = () => {
+    enemiesRef.current.forEach(enemy => resetEnemyAppearance(enemy));
   };
 
   const updateScore = (points) => {
@@ -349,113 +168,27 @@ const GameScreen = () => {
     }));
   };
 
-  const startRenderLoop = () => {
-    const animate = () => {
-      animationFrameRef.current = requestAnimationFrame(animate);
-      
-      try {
-        // Animation basique des ennemis
-        animateEnemies();
-        
-        // Rendu de la scène
-        if (rendererRef.current && sceneRef.current && cameraRef.current) {
-          rendererRef.current.render(sceneRef.current, cameraRef.current);
-        }
-        
-        // Forcer le rendu GL pour Expo
-        if (rendererRef.current && rendererRef.current.getContext) {
-          const gl = rendererRef.current.getContext();
-          if (gl && gl.endFrameEXP) {
-            gl.endFrameEXP();
-          }
-        }
-      } catch (error) {
-        console.error('Error in render loop:', error);
-      }
-    };
-    
-    animate();
-  };
-
-  const animateEnemies = () => {
-    if (enemiesRef.current.length === 0) return;
-    
-    try {
-      const time = Date.now() * 0.001;
-      
-      enemiesRef.current.forEach((enemy, i) => {
-        if (enemy) {
-          // Rotation lente
-          enemy.rotation.y = time * 0.5 + i;
-          
-          // Mouvement vertical subtil
-          enemy.position.y = GAME_CONFIG.ENEMIES.SIZE * 0.8 + 
-                            Math.sin(time * 2 + i) * 0.3;
-          
-          // Scale pulsation pour les ennemis attaquants
-          if (enemy.userData.isAttacking) {
-            const scale = 1 + Math.sin(time * 8) * 0.1;
-            enemy.scale.set(scale, scale, scale);
-          } else {
-            enemy.scale.set(1, 1, 1);
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Error animating enemies:', error);
-    }
-  };
-
   const handleDodge = () => {
-    console.log('Dodge button pressed');
-    if (gameLogicRef.current.awaitingAction) {
-      handlePlayerAction(DEFENSE_ACTIONS.DODGE);
-    }
+    handlePlayerAction(DEFENSE_ACTIONS.DODGE);
   };
 
   const handleParry = () => {
-    console.log('Parry button pressed');
-    if (gameLogicRef.current.awaitingAction) {
-      handlePlayerAction(DEFENSE_ACTIONS.PARRY);
-    }
+    handlePlayerAction(DEFENSE_ACTIONS.PARRY);
   };
 
   const handlePlayerAction = (action) => {
-    if (!gameLogicRef.current.awaitingAction) return;
+    const result = gameLogic.current.checkPlayerAction(action);
+    if (!result) return;
     
-    console.log(`Player action: ${action}, expected: ${gameLogicRef.current.expectedAction}`);
+    console.log(`Action result: ${result.message} (${result.points} points)`);
     
-    const isCorrect = action === gameLogicRef.current.expectedAction;
-    const timeTaken = Date.now() - gameLogicRef.current.attackStartTime;
+    resetAllEnemies();
+    updateScore(result.points);
     
-    let points = 0;
-    let message = '';
-    
-    if (isCorrect) {
-      if (timeTaken < 1000) {
-        points = 100;
-        message = 'PARFAIT!';
-      } else {
-        points = 50;
-        message = 'Bien!';
-      }
-    } else {
-      points = -50;
-      message = 'Mauvaise action!';
-    }
-    
-    console.log(`Action result: ${message} (${points} points)`);
-    
-    resetAttackState();
-    updateScore(points);
-    
-    // Programmer la prochaine attaque
-    setTimeout(() => {
-      triggerRandomAttack();
-    }, 1500);
+    setTimeout(() => triggerRandomAttack(), 1500);
   };
 
-  // Nettoyage à la destruction du composant
+  // Nettoyage
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) {
@@ -489,11 +222,6 @@ const styles = StyleSheet.create({
   },
   glView: {
     flex: 1,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
 });
 
