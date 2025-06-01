@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { GLView } from 'expo-gl';
-import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import GameUI from './GameUI';
 import { GAME_CONFIG, GAME_STATES } from '../utils/Constants';
+import { GameRenderer } from '../engine/GameRenderer';
 import { 
   setupScene, 
   setupCamera, 
@@ -43,12 +43,11 @@ const GameScreen = () => {
   const initializeScene = async (gl) => {
     try {
       console.log('Initializing 3D scene...');
+      console.log('GL context:', gl);
       
-      // Créer le renderer
-      const renderer = new Renderer({ gl });
-      renderer.setSize(screenWidth, screenHeight);
-      renderer.setClearColor(0x1a1a1a, 1.0);
-      rendererRef.current = renderer;
+      // Créer le renderer avec le module GameRenderer
+      const gameRenderer = new GameRenderer(gl, screenWidth, screenHeight);
+      rendererRef.current = gameRenderer;
 
       // Créer la scène et la caméra
       const scene = setupScene();
@@ -75,6 +74,7 @@ const GameScreen = () => {
       enemiesRef.current = enemies;
 
       console.log('Scene initialized with', scene.children.length, 'objects');
+      console.log('Camera FOV:', camera.fov, 'Aspect:', camera.aspect);
 
       // Démarrer la boucle de rendu
       startRenderLoop();
@@ -84,10 +84,13 @@ const GameScreen = () => {
       
     } catch (error) {
       console.error('Error initializing scene:', error);
+      console.error(error.stack);
     }
   };
 
   const startRenderLoop = () => {
+    let frameCount = 0;
+    
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
       
@@ -104,10 +107,10 @@ const GameScreen = () => {
           rendererRef.current.render(sceneRef.current, cameraRef.current);
         }
         
-        // Forcer le rendu GL pour Expo
-        const gl = rendererRef.current?.getContext();
-        if (gl && gl.endFrameEXP) {
-          gl.endFrameEXP();
+        // Log toutes les 60 frames
+        frameCount++;
+        if (frameCount % 60 === 0) {
+          console.log('Rendering frame', frameCount);
         }
       } catch (error) {
         console.error('Error in render loop:', error);
@@ -194,6 +197,9 @@ const GameScreen = () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+      }
     };
   }, []);
 
@@ -219,6 +225,7 @@ const GameScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#1a1a1a',
   },
   glView: {
     flex: 1,
