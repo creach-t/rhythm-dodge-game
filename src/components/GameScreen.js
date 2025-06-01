@@ -4,9 +4,16 @@ import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import GameUI from './GameUI';
-import { GAME_CONFIG, DEFENSE_ACTIONS, GAME_STATES } from '../utils/Constants';
+import { GAME_CONFIG, GAME_STATES } from '../utils/Constants';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Définir DEFENSE_ACTIONS directement ici
+const DEFENSE_ACTIONS = {
+  NONE: 'none',
+  DODGE: 'dodge',
+  PARRY: 'parry'
+};
 
 const GameScreen = () => {
   const [gameState, setGameState] = useState({
@@ -43,6 +50,7 @@ const GameScreen = () => {
 
       // Créer la scène
       const scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0x1a1a1a, 20, 50); // Ajouter du brouillard pour la profondeur
       sceneRef.current = scene;
 
       // Créer la caméra avec aspect ratio portrait
@@ -100,16 +108,17 @@ const GameScreen = () => {
   const setupLighting = (scene) => {
     try {
       // Lumière ambiante plus forte pour voir les objets
-      const ambientLight = new THREE.AmbientLight(0x404040, 1.0);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
       scene.add(ambientLight);
 
       // Lumière directionnelle principale
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
       directionalLight.position.set(5, 10, 5);
+      directionalLight.castShadow = true;
       scene.add(directionalLight);
 
       // Lumière d'appoint
-      const fillLight = new THREE.DirectionalLight(0x4ecdc4, 0.5);
+      const fillLight = new THREE.DirectionalLight(0x4ecdc4, 0.4);
       fillLight.position.set(-5, 5, -5);
       scene.add(fillLight);
       
@@ -122,47 +131,25 @@ const GameScreen = () => {
   const createGameObjects = (scene) => {
     try {
       // Sol/Arène plus grand
-      const groundGeometry = new THREE.CircleGeometry(10, 32);
-      const groundMaterial = new THREE.MeshBasicMaterial({ 
+      const groundGeometry = new THREE.CircleGeometry(15, 32);
+      const groundMaterial = new THREE.MeshPhongMaterial({ 
         color: 0x333333,
-        transparent: true,
-        opacity: 0.8
+        emissive: 0x111111,
+        shininess: 10
       });
       const ground = new THREE.Mesh(groundGeometry, groundMaterial);
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -0.1;
+      ground.receiveShadow = true;
       ground.name = 'ground';
       scene.add(ground);
 
       // Grille de référence plus visible
       const gridSize = 20;
       const gridDivisions = 20;
-      const gridMaterial = new THREE.LineBasicMaterial({ color: 0x666666 });
-      const gridGeometry = new THREE.BufferGeometry();
-      
-      const positions = [];
-      const halfSize = gridSize / 2;
-      const step = gridSize / gridDivisions;
-      
-      // Lignes horizontales
-      for (let i = 0; i <= gridDivisions; i++) {
-        const z = i * step - halfSize;
-        positions.push(-halfSize, 0, z);
-        positions.push(halfSize, 0, z);
-      }
-      
-      // Lignes verticales
-      for (let i = 0; i <= gridDivisions; i++) {
-        const x = i * step - halfSize;
-        positions.push(x, 0, -halfSize);
-        positions.push(x, 0, halfSize);
-      }
-      
-      gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
-      grid.position.y = -0.05;
-      grid.name = 'grid';
-      scene.add(grid);
+      const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x666666, 0x444444);
+      gridHelper.position.y = 0.01;
+      scene.add(gridHelper);
 
       // Joueur (cube bleu au centre) - Plus grand et plus visible
       const playerGeometry = new THREE.BoxGeometry(
@@ -170,13 +157,18 @@ const GameScreen = () => {
         GAME_CONFIG.PLAYER.SIZE * 1.5,
         GAME_CONFIG.PLAYER.SIZE
       );
-      const playerMaterial = new THREE.MeshBasicMaterial({ color: 0x4ecdc4 });
+      const playerMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0x4ecdc4,
+        emissive: 0x2a7a7a,
+        shininess: 100
+      });
       const player = new THREE.Mesh(playerGeometry, playerMaterial);
       player.position.set(
         GAME_CONFIG.PLAYER.POSITION.x,
         GAME_CONFIG.PLAYER.SIZE * 0.75,
         GAME_CONFIG.PLAYER.POSITION.z
       );
+      player.castShadow = true;
       player.name = 'player';
       scene.add(player);
       console.log('Player created at position:', player.position);
@@ -202,22 +194,24 @@ const GameScreen = () => {
         // Créer différentes géométries pour chaque ennemi - Plus grosses
         switch (i) {
           case 0:
-            geometry = new THREE.ConeGeometry(1.0, 2.5, 8);
+            geometry = new THREE.ConeGeometry(1.2, 3.0, 8);
             break;
           case 1:
-            geometry = new THREE.SphereGeometry(1.2, 12, 8);
+            geometry = new THREE.SphereGeometry(1.5, 12, 8);
             break;
           case 2:
-            geometry = new THREE.CylinderGeometry(1.0, 1.0, 2.2, 12);
+            geometry = new THREE.CylinderGeometry(1.2, 1.2, 2.5, 12);
             break;
           default:
-            geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            geometry = new THREE.BoxGeometry(2, 2, 2);
         }
         
-        const material = new THREE.MeshBasicMaterial({ 
+        // Utiliser MeshPhongMaterial pour une meilleure visibilité
+        const material = new THREE.MeshPhongMaterial({ 
           color: enemyColors[i],
-          transparent: false,
-          opacity: 1.0
+          emissive: enemyColors[i],
+          emissiveIntensity: 0.2,
+          shininess: 100
         });
         
         const enemy = new THREE.Mesh(geometry, material);
@@ -232,6 +226,7 @@ const GameScreen = () => {
           Math.sin(angle) * radius
         );
         
+        enemy.castShadow = true;
         enemy.name = `enemy_${i}`;
         enemy.userData = { 
           id: i, 
@@ -273,7 +268,7 @@ const GameScreen = () => {
       
       const enemy = enemiesRef.current[enemyId];
       if (enemy) {
-        // Changer la couleur pour indiquer l'attaque
+        // Changer la couleur et l'émission pour indiquer l'attaque
         let highlightColor;
         switch (attackType) {
           case 'normal':
@@ -293,6 +288,8 @@ const GameScreen = () => {
         }
         
         enemy.material.color.setHex(highlightColor);
+        enemy.material.emissive.setHex(highlightColor);
+        enemy.material.emissiveIntensity = 0.5;
         enemy.userData.isAttacking = true;
         enemy.userData.attackType = attackType;
         
@@ -330,6 +327,8 @@ const GameScreen = () => {
       enemiesRef.current.forEach(enemy => {
         if (enemy && enemy.userData) {
           enemy.material.color.setHex(enemy.userData.originalColor);
+          enemy.material.emissive.setHex(enemy.userData.originalColor);
+          enemy.material.emissiveIntensity = 0.2;
           enemy.userData.isAttacking = false;
           enemy.userData.attackType = null;
         }
@@ -364,8 +363,11 @@ const GameScreen = () => {
         }
         
         // Forcer le rendu GL pour Expo
-        if (rendererRef.current && rendererRef.current.getContext && rendererRef.current.getContext().endFrameEXP) {
-          rendererRef.current.getContext().endFrameEXP();
+        if (rendererRef.current && rendererRef.current.getContext) {
+          const gl = rendererRef.current.getContext();
+          if (gl && gl.endFrameEXP) {
+            gl.endFrameEXP();
+          }
         }
       } catch (error) {
         console.error('Error in render loop:', error);
@@ -389,6 +391,14 @@ const GameScreen = () => {
           // Mouvement vertical subtil
           enemy.position.y = GAME_CONFIG.ENEMIES.SIZE * 0.8 + 
                             Math.sin(time * 2 + i) * 0.3;
+          
+          // Scale pulsation pour les ennemis attaquants
+          if (enemy.userData.isAttacking) {
+            const scale = 1 + Math.sin(time * 8) * 0.1;
+            enemy.scale.set(scale, scale, scale);
+          } else {
+            enemy.scale.set(1, 1, 1);
+          }
         }
       });
     } catch (error) {
