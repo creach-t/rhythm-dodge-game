@@ -3,7 +3,7 @@
     "name": "Rhythm Dodge Game",
     "slug": "rhythm-dodge-game",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "rhythm-dodge-game",
     "platforms": ["ios", "android", "web"],
