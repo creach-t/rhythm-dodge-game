@@ -29,7 +29,8 @@ const GameScreen = () => {
     state: GAME_STATES.PLAYING,
     score: 0,
     health: 100,
-    combo: 0
+    combo: 0,
+    expectedAction: null
   });
 
   const sceneRef = useRef(null);
@@ -127,6 +128,7 @@ const GameScreen = () => {
 
   const triggerRandomAttack = () => {
     if (gameLogic.current.awaitingAction) return;
+    if (gameState.state !== GAME_STATES.PLAYING) return;
     
     try {
       const enemyId = Math.floor(Math.random() * GAME_CONFIG.ENEMIES.MAX_COUNT);
@@ -137,6 +139,12 @@ const GameScreen = () => {
       const enemy = enemiesRef.current[enemyId];
       if (enemy && gameLogic.current.triggerAttack(enemyId, attackType)) {
         highlightEnemyAttack(enemy, attackType);
+        
+        // Mettre à jour l'action attendue dans l'UI
+        setGameState(prev => ({
+          ...prev,
+          expectedAction: gameLogic.current.expectedAction
+        }));
         
         // Timeout après 3 secondes
         setTimeout(() => {
@@ -153,22 +161,44 @@ const GameScreen = () => {
   const handleMissedAction = () => {
     console.log('Player missed the action!');
     resetAllEnemies();
-    updateScore(-25);
+    
+    // Perdre de la santé et mettre à jour le score
+    setGameState(prev => ({
+      ...prev,
+      health: Math.max(0, prev.health - 10),
+      score: Math.max(0, prev.score - 25),
+      combo: 0,
+      expectedAction: null
+    }));
+    
     gameLogic.current.reset();
     
-    setTimeout(() => triggerRandomAttack(), 2000);
+    // Vérifier si game over
+    if (gameState.health <= 10) {
+      handleGameOver();
+    } else {
+      setTimeout(() => triggerRandomAttack(), 2000);
+    }
   };
 
   const resetAllEnemies = () => {
     enemiesRef.current.forEach(enemy => resetEnemyAppearance(enemy));
   };
 
-  const updateScore = (points) => {
-    setGameState(prevState => ({
-      ...prevState,
-      score: Math.max(0, prevState.score + points),
-      combo: points > 0 ? prevState.combo + 1 : 0
-    }));
+  const updateGameState = (points) => {
+    setGameState(prev => {
+      const newHealth = points < 0 ? Math.max(0, prev.health - 20) : prev.health;
+      const newScore = Math.max(0, prev.score + points);
+      const newCombo = points > 0 ? prev.combo + 1 : 0;
+      
+      return {
+        ...prev,
+        score: newScore,
+        health: newHealth,
+        combo: newCombo,
+        expectedAction: null
+      };
+    });
   };
 
   const handleDodge = () => {
@@ -186,9 +216,28 @@ const GameScreen = () => {
     console.log(`Action result: ${result.message} (${result.points} points)`);
     
     resetAllEnemies();
-    updateScore(result.points);
+    updateGameState(result.points);
     
-    setTimeout(() => triggerRandomAttack(), 1500);
+    // Vérifier si game over après une mauvaise action
+    if (!result.isCorrect && gameState.health <= 20) {
+      handleGameOver();
+    } else {
+      setTimeout(() => triggerRandomAttack(), 1500);
+    }
+  };
+
+  const handleGameOver = () => {
+    console.log('Game Over!');
+    setGameState(prev => ({
+      ...prev,
+      state: GAME_STATES.GAME_OVER,
+      expectedAction: null
+    }));
+    
+    // Arrêter les animations
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
   };
 
   // Nettoyage
@@ -215,6 +264,7 @@ const GameScreen = () => {
         health={gameState.health}
         combo={gameState.combo}
         gameState={gameState.state}
+        expectedAction={gameState.expectedAction}
         onDodge={handleDodge}
         onParry={handleParry}
       />
