@@ -4,11 +4,12 @@ import {
   TURN_STATES, 
   PLAYER_ACTIONS, 
   UI_CONFIG, 
-  COLORS 
+  COLORS,
+  ATTACK_TYPES 
 } from '../utils/Constants';
 
 /**
- * Composant d'interface pour les tours
+ * Composant d'interface pour les tours - CORRIGÉ POUR FEINTES
  * Responsabilité unique : Interface utilisateur pour les actions de tour
  */
 const TurnBasedUI = ({
@@ -167,59 +168,81 @@ const TurnBasedUI = ({
     );
   };
 
-  // Rendu des boutons de défense (pendant les attaques ennemies)
+  // Rendu des boutons de défense (pendant les attaques ennemies) - CORRIGÉ FEINTE
   const renderDefenseActions = () => {
     if (turnState.currentTurn !== TURN_STATES.ENEMY_TURN || !currentAttack) return null;
 
+    // Déterminer le type d'attaque pour afficher les instructions correctes
+    const attackType = currentAttack.type;
+    let instructionText = '';
+    let instructionColor = COLORS.TEXT;
+
+    if (attackType === ATTACK_TYPES.FEINT) {
+      instructionText = "🎭 FEINTE ! Ne bougez pas !";
+      instructionColor = COLORS.DANGER;
+    } else {
+      instructionText = `Ennemi ${currentAttack.enemyId + 1} attaque !`;
+      instructionColor = COLORS.WARNING;
+    }
+
     return (
-      <View style={styles.defenseContainer}>
-        <Text style={styles.defenseTitle}>
-          Ennemi {currentAttack.enemyId + 1} attaque !
+      <View style={[
+        styles.defenseContainer,
+        attackType === ATTACK_TYPES.FEINT && styles.feintContainer
+      ]}>
+        <Text style={[styles.defenseTitle, { color: instructionColor }]}>
+          {instructionText}
         </Text>
         
         {expectedDefense && (
-          <Text style={styles.expectedActionText}>
-            Action attendue : {getDefenseActionText(expectedDefense)}
+          <Text style={[
+            styles.expectedActionText,
+            attackType === ATTACK_TYPES.FEINT && styles.feintInstructionText
+          ]}>
+            {attackType === ATTACK_TYPES.FEINT 
+              ? "🚫 N'appuyez sur AUCUN bouton ! 🚫" 
+              : `Action attendue : ${getDefenseActionText(expectedDefense)}`
+            }
           </Text>
         )}
 
-        <View style={styles.defenseButtonsRow}>
-          <TouchableOpacity
-            style={[
-              styles.defenseButton,
-              styles.dodgeButton,
-              expectedDefense === 'dodge' && styles.expectedButton
-            ]}
-            onPress={onDodge}
-          >
-            <Text style={styles.defenseButtonText}>Esquiver</Text>
-            <Text style={styles.defenseButtonSubtext}>vs Normal</Text>
-          </TouchableOpacity>
+        {/* Pour les feintes, pas de boutons OU boutons désactivés avec warning */}
+        {attackType === ATTACK_TYPES.FEINT ? (
+          <View style={styles.feintWarningContainer}>
+            <Text style={styles.feintWarningText}>
+              ⚠️ Tout mouvement = échec ! ⚠️
+            </Text>
+            <Text style={styles.feintSubtext}>
+              Restez immobile jusqu'à la fin de l'attaque
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.defenseButtonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.defenseButton,
+                styles.dodgeButton,
+                expectedDefense === 'dodge' && styles.expectedButton
+              ]}
+              onPress={onDodge}
+            >
+              <Text style={styles.defenseButtonText}>Esquiver</Text>
+              <Text style={styles.defenseButtonSubtext}>vs Normal</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.defenseButton,
-              styles.parryButton,
-              expectedDefense === 'parry' && styles.expectedButton
-            ]}
-            onPress={onParry}
-          >
-            <Text style={styles.defenseButtonText}>Parer</Text>
-            <Text style={styles.defenseButtonSubtext}>vs Lourd</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.defenseButton,
-              styles.waitButton,
-              expectedDefense === 'none' && styles.expectedButton
-            ]}
-            onPress={onWaitForFeint}
-          >
-            <Text style={styles.defenseButtonText}>Attendre</Text>
-            <Text style={styles.defenseButtonSubtext}>vs Feinte</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[
+                styles.defenseButton,
+                styles.parryButton,
+                expectedDefense === 'parry' && styles.expectedButton
+              ]}
+              onPress={onParry}
+            >
+              <Text style={styles.defenseButtonText}>Parer</Text>
+              <Text style={styles.defenseButtonSubtext}>vs Lourd</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -229,7 +252,7 @@ const TurnBasedUI = ({
     switch (action) {
       case 'dodge': return 'Esquiver';
       case 'parry': return 'Parer';
-      case 'none': return 'Attendre';
+      case 'none': return 'Ne rien faire';
       default: return 'Inconnue';
     }
   };
@@ -476,7 +499,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT,
   },
 
-  // Actions de défense
+  // Actions de défense - CORRIGÉ POUR FEINTES
   defenseContainer: {
     position: 'absolute',
     bottom: UI_CONFIG.HUD.PADDING,
@@ -489,10 +512,16 @@ const styles = StyleSheet.create({
     borderColor: COLORS.DANGER,
   },
 
+  // Style spécial pour les feintes
+  feintContainer: {
+    borderColor: COLORS.ATTACK_FEINT,
+    borderWidth: 3,
+    backgroundColor: '#2a1a1a', // Fond plus sombre pour les feintes
+  },
+
   defenseTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.DANGER,
     textAlign: 'center',
     marginBottom: 10,
   },
@@ -502,6 +531,38 @@ const styles = StyleSheet.create({
     color: COLORS.WARNING,
     textAlign: 'center',
     marginBottom: 15,
+    fontStyle: 'italic',
+  },
+
+  // Styles spéciaux pour les instructions de feinte
+  feintInstructionText: {
+    fontSize: 18,
+    color: COLORS.ATTACK_FEINT,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  feintWarningContainer: {
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: COLORS.ATTACK_FEINT + '20', // Fond rouge transparent
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.ATTACK_FEINT,
+  },
+
+  feintWarningText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.ATTACK_FEINT,
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+
+  feintSubtext: {
+    fontSize: 14,
+    color: COLORS.TEXT_SECONDARY,
+    textAlign: 'center',
     fontStyle: 'italic',
   },
 
