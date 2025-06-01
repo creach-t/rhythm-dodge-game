@@ -26,6 +26,9 @@ const GameScreen = () => {
   // Initialisation de la scène 3D
   const initializeScene = async (gl) => {
     try {
+      console.log('Initializing 3D scene...');
+      console.log('Screen dimensions:', screenWidth, 'x', screenHeight);
+      
       const renderer = new Renderer({ gl });
       renderer.setSize(screenWidth, screenHeight);
       renderer.setClearColor(0x1a1a1a, 1.0);
@@ -35,7 +38,7 @@ const GameScreen = () => {
       const scene = new THREE.Scene();
       sceneRef.current = scene;
 
-      // Créer la caméra
+      // Créer la caméra avec aspect ratio portrait
       const camera = new THREE.PerspectiveCamera(
         GAME_CONFIG.CAMERA.FOV,
         screenWidth / screenHeight,
@@ -58,12 +61,20 @@ const GameScreen = () => {
       );
       
       cameraRef.current = camera;
+      console.log('Camera position:', camera.position);
+      console.log('Camera aspect:', camera.aspect);
 
       // Ajouter l'éclairage
       setupLighting(scene);
 
       // Créer les objets de base
       createGameObjects(scene);
+
+      // Debug: Afficher le nombre d'objets dans la scène
+      console.log('Scene children count:', scene.children.length);
+      scene.children.forEach((child, index) => {
+        console.log(`Child ${index}:`, child.type, child.name || 'unnamed', child.position);
+      });
 
       // Initialiser le moteur de jeu
       gameEngineRef.current = new GameEngine({
@@ -84,17 +95,17 @@ const GameScreen = () => {
 
   const setupLighting = (scene) => {
     try {
-      // Lumière ambiante
-      const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+      // Lumière ambiante plus forte pour voir les objets
+      const ambientLight = new THREE.AmbientLight(0x404040, 1.0);
       scene.add(ambientLight);
 
       // Lumière directionnelle principale
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
       directionalLight.position.set(5, 10, 5);
       scene.add(directionalLight);
 
       // Lumière d'appoint
-      const fillLight = new THREE.DirectionalLight(0x4ecdc4, 0.3);
+      const fillLight = new THREE.DirectionalLight(0x4ecdc4, 0.5);
       fillLight.position.set(-5, 5, -5);
       scene.add(fillLight);
       
@@ -106,8 +117,8 @@ const GameScreen = () => {
 
   const createGameObjects = (scene) => {
     try {
-      // Sol/Arène
-      const groundGeometry = new THREE.CircleGeometry(8, 32);
+      // Sol/Arène plus grand
+      const groundGeometry = new THREE.CircleGeometry(10, 32);
       const groundMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x333333,
         transparent: true,
@@ -116,24 +127,24 @@ const GameScreen = () => {
       const ground = new THREE.Mesh(groundGeometry, groundMaterial);
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -0.1;
+      ground.name = 'ground';
       scene.add(ground);
 
-      // Grille de référence (simplifié pour éviter les erreurs)
-      const gridSize = 16;
-      const gridDivisions = 16;
-      const gridMaterial = new THREE.LineBasicMaterial({ color: 0x444444 });
+      // Grille de référence plus visible
+      const gridSize = 20;
+      const gridDivisions = 20;
+      const gridMaterial = new THREE.LineBasicMaterial({ color: 0x666666 });
       const gridGeometry = new THREE.BufferGeometry();
       
-      // Créer une grille simple
       const positions = [];
       const halfSize = gridSize / 2;
       const step = gridSize / gridDivisions;
       
       // Lignes horizontales
       for (let i = 0; i <= gridDivisions; i++) {
-        const y = i * step - halfSize;
-        positions.push(-halfSize, 0, y);
-        positions.push(halfSize, 0, y);
+        const z = i * step - halfSize;
+        positions.push(-halfSize, 0, z);
+        positions.push(halfSize, 0, z);
       }
       
       // Lignes verticales
@@ -146,9 +157,10 @@ const GameScreen = () => {
       gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
       grid.position.y = -0.05;
+      grid.name = 'grid';
       scene.add(grid);
 
-      // Joueur (cube bleu au centre)
+      // Joueur (cube bleu au centre) - Plus grand et plus visible
       const playerGeometry = new THREE.BoxGeometry(
         GAME_CONFIG.PLAYER.SIZE,
         GAME_CONFIG.PLAYER.SIZE * 1.5,
@@ -163,6 +175,7 @@ const GameScreen = () => {
       );
       player.name = 'player';
       scene.add(player);
+      console.log('Player created at position:', player.position);
 
       // Ennemis (formes géométriques temporaires)
       createEnemies(scene);
@@ -181,31 +194,31 @@ const GameScreen = () => {
       for (let i = 0; i < GAME_CONFIG.ENEMIES.MAX_COUNT; i++) {
         let geometry;
         
-        // Créer différentes géométries pour chaque ennemi
+        // Créer différentes géométries pour chaque ennemi - Plus grosses
         switch (i) {
           case 0:
-            geometry = new THREE.ConeGeometry(0.6, 1.8, 6);
+            geometry = new THREE.ConeGeometry(1.0, 2.5, 8);
             break;
           case 1:
-            geometry = new THREE.SphereGeometry(0.8, 8, 6);
+            geometry = new THREE.SphereGeometry(1.2, 12, 8);
             break;
           case 2:
-            geometry = new THREE.CylinderGeometry(0.6, 0.6, 1.6, 8);
+            geometry = new THREE.CylinderGeometry(1.0, 1.0, 2.2, 12);
             break;
           default:
-            geometry = new THREE.BoxGeometry(1, 1, 1);
+            geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         }
         
         const material = new THREE.MeshBasicMaterial({ 
           color: enemyColors[i],
-          transparent: true,
-          opacity: 0.9
+          transparent: false,  // Pas de transparence pour plus de visibilité
+          opacity: 1.0
         });
         
         const enemy = new THREE.Mesh(geometry, material);
         
-        // Positionner en arc de cercle face au joueur
-        const angle = angleStep * i - Math.PI / 2; // Centrer l'arc
+        // Positionner en arc de cercle face au joueur - Plus proches
+        const angle = angleStep * i - Math.PI / 2;
         const radius = GAME_CONFIG.ENEMIES.SPAWN_RADIUS;
         
         enemy.position.set(
@@ -223,9 +236,10 @@ const GameScreen = () => {
         };
         
         scene.add(enemy);
+        console.log(`Enemy ${i} created at position:`, enemy.position, 'color:', enemyColors[i].toString(16));
       }
       
-      console.log('Enemies created successfully');
+      console.log('All enemies created successfully');
     } catch (error) {
       console.error('Error creating enemies:', error);
     }
@@ -275,7 +289,7 @@ const GameScreen = () => {
           
           // Mouvement vertical subtil
           enemy.position.y = GAME_CONFIG.ENEMIES.SIZE * 0.8 + 
-                            Math.sin(time * 2 + i) * 0.2;
+                            Math.sin(time * 2 + i) * 0.3;
         }
       }
     } catch (error) {
@@ -288,12 +302,14 @@ const GameScreen = () => {
   };
 
   const handleDodge = () => {
+    console.log('Dodge button pressed');
     if (gameEngineRef.current && gameState.state === GAME_STATES.PLAYING) {
       gameEngineRef.current.handlePlayerAction(DEFENSE_ACTIONS.DODGE);
     }
   };
 
   const handleParry = () => {
+    console.log('Parry button pressed');
     if (gameEngineRef.current && gameState.state === GAME_STATES.PLAYING) {
       gameEngineRef.current.handlePlayerAction(DEFENSE_ACTIONS.PARRY);
     }
