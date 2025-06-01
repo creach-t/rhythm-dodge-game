@@ -21,8 +21,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a1a"
-      },
-      "orientationLock": "landscape"
+      }
     },
     "web": {
       "bundler": "metro",
