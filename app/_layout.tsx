@@ -6,12 +6,11 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="light" hidden={true} />
-      <Stack>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen 
           name="index" 
           options={{ 
-            headerShown: false,
-            orientation: 'landscape'
+            headerShown: false
           }} 
         />
       </Stack>
