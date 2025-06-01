@@ -1,25 +1,26 @@
 {
   "name": "rhythm-dodge-game",
   "version": "1.0.0",
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "eject": "expo eject"
+    "reset-project": "node ./scripts/reset-project.js"
   },
   "dependencies": {
-    "expo": "~49.0.15",
-    "expo-gl": "~13.6.0",
-    "expo-status-bar": "~1.6.0",
-    "react": "18.2.0",
-    "react-native": "0.72.6",
-    "three": "^0.145.0",
-    "expo-three": "^7.0.0"
+    "expo": "~53.0.0",
+    "expo-gl": "~15.0.2",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.3",
+    "three": "^0.169.0",
+    "expo-three": "^8.0.0",
+    "expo-router": "~4.0.9"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.25.2"
   },
   "private": true,
   "description": "Jeu d'esquive rythmée mobile avec Expo et Three.js",
