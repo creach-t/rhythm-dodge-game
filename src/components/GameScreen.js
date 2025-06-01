@@ -188,8 +188,10 @@ const GameScreen = () => {
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
       
-      // Forcer le rendu GL
-      rendererRef.current.getContext().endFrameEXP();
+      // Forcer le rendu GL pour Expo SDK 53
+      if (rendererRef.current && rendererRef.current.getContext) {
+        rendererRef.current.getContext().endFrameEXP();
+      }
     };
     
     animate();
