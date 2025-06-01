@@ -8,7 +8,9 @@ const GameButton = ({
   type = 'primary', 
   disabled = false,
   style = {},
-  testID
+  testID,
+  color = null,
+  highlighted = false
 }) => {
   const [scaleAnim] = useState(new Animated.Value(1));
   const [isPressed, setIsPressed] = useState(false);
@@ -45,25 +47,32 @@ const GameButton = ({
     let backgroundColor = COLORS.PRIMARY;
     let borderColor = COLORS.PRIMARY;
 
-    switch (type) {
-      case 'dodge':
-        backgroundColor = COLORS.WARNING;
-        borderColor = COLORS.WARNING;
-        break;
-      case 'parry':
-        backgroundColor = COLORS.SECONDARY;
-        borderColor = COLORS.SECONDARY;
-        break;
-      case 'danger':
-        backgroundColor = COLORS.DANGER;
-        borderColor = COLORS.DANGER;
-        break;
-      case 'success':
-        backgroundColor = COLORS.SUCCESS;
-        borderColor = COLORS.SUCCESS;
-        break;
-      default:
-        break;
+    // Si une couleur spécifique est fournie, l'utiliser
+    if (color) {
+      backgroundColor = color;
+      borderColor = color;
+    } else {
+      // Sinon, utiliser les couleurs par défaut selon le type
+      switch (type) {
+        case 'dodge':
+          backgroundColor = COLORS.WARNING;
+          borderColor = COLORS.WARNING;
+          break;
+        case 'parry':
+          backgroundColor = COLORS.SECONDARY;
+          borderColor = COLORS.SECONDARY;
+          break;
+        case 'danger':
+          backgroundColor = COLORS.DANGER;
+          borderColor = COLORS.DANGER;
+          break;
+        case 'success':
+          backgroundColor = COLORS.SUCCESS;
+          borderColor = COLORS.SUCCESS;
+          break;
+        default:
+          break;
+      }
     }
 
     if (disabled) {
@@ -71,17 +80,25 @@ const GameButton = ({
       borderColor = COLORS.UI_BORDER;
     }
 
+    // Si le bouton est mis en évidence, augmenter la luminosité
+    if (highlighted && !disabled) {
+      borderColor = backgroundColor;
+      borderWidth = 5;
+    }
+
     return {
       backgroundColor,
       borderColor,
-      opacity: disabled ? 0.5 : 1
+      opacity: disabled ? 0.5 : 1,
+      borderWidth: highlighted ? 5 : 3
     };
   };
 
   const getTextStyle = () => {
     return {
       color: disabled ? COLORS.TEXT_SECONDARY : COLORS.TEXT,
-      fontWeight: isPressed ? 'bold' : '600'
+      fontWeight: isPressed ? 'bold' : '600',
+      fontSize: highlighted ? 24 : 20
     };
   };
 
@@ -90,6 +107,7 @@ const GameButton = ({
       style={[
         styles.container,
         { transform: [{ scale: scaleAnim }] },
+        highlighted && styles.highlightedContainer,
         style
       ]}
     >
@@ -120,16 +138,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 8,
   },
+  highlightedContainer: {
+    shadowColor: '#fff',
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 12,
+  },
   button: {
     width: BUTTON_CONFIG.SIZE,
     height: BUTTON_CONFIG.SIZE,
     borderRadius: BUTTON_CONFIG.BORDER_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
   },
   buttonText: {
-    fontSize: 16,
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 1,
