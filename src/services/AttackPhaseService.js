@@ -8,7 +8,7 @@ import {
 } from '../utils/Constants';
 
 /**
- * Service de gestion des phases d'attaque
+ * Service de gestion des phases d'attaque - VERSION CORRIGÉE
  * Responsabilité unique : Gestion des phases visuelles et timing des attaques
  */
 class AttackPhaseService {
@@ -17,6 +17,8 @@ class AttackPhaseService {
     this.phaseStartTime = 0;
     this.phaseTimeouts = new Map();
     this.attackingEnemies = new Set();
+    this.awaitingPlayerResponse = false;
+    this.executionStartTime = 0;
   }
 
   /**
@@ -37,7 +39,7 @@ class AttackPhaseService {
     this.attackingEnemies.add(enemyId);
 
     if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
-      console.log(`Starting attack: Enemy ${enemyId}, Type: ${attackType}`);
+      console.log(`🎯 Starting attack: Enemy ${enemyId}, Type: ${attackType}`);
     }
 
     // Phase 1: Preparation
@@ -51,11 +53,15 @@ class AttackPhaseService {
   }
 
   /**
-   * Phase 1: Préparation de l'attaque
+   * Phase 1: Préparation de l'attaque - 3 secondes
    */
   _startPreparationPhase(enemy, attackType, callbacks) {
     this.currentPhase = ATTACK_PHASES.PREPARATION;
     this.phaseStartTime = performance.now();
+
+    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+      console.log(`⚠️  PREPARATION phase started - ${TIMING_CONFIG.ATTACK_PREPARATION_DURATION}ms`);
+    }
 
     // Effets visuels de préparation
     this._applyPreparationVisuals(enemy, attackType);
@@ -67,18 +73,26 @@ class AttackPhaseService {
 
     // Programmer la phase d'exécution
     const timeout = setTimeout(() => {
-      this._startExecutionPhase(enemy, attackType, callbacks);
+      if (this.attackingEnemies.has(enemy.userData.id)) {
+        this._startExecutionPhase(enemy, attackType, callbacks);
+      }
     }, TIMING_CONFIG.ATTACK_PREPARATION_DURATION);
 
     this.phaseTimeouts.set(enemy.userData.id, timeout);
   }
 
   /**
-   * Phase 2: Exécution de l'attaque
+   * Phase 2: Exécution de l'attaque - 2 secondes pour réagir
    */
   _startExecutionPhase(enemy, attackType, callbacks) {
     this.currentPhase = ATTACK_PHASES.EXECUTION;
     this.phaseStartTime = performance.now();
+    this.executionStartTime = performance.now();
+    this.awaitingPlayerResponse = true;
+
+    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+      console.log(`⚡ EXECUTION phase started - ${TIMING_CONFIG.ATTACK_EXECUTION_DURATION}ms to react!`);
+    }
 
     // Effets visuels d'exécution
     this._applyExecutionVisuals(enemy, attackType);
@@ -94,18 +108,31 @@ class AttackPhaseService {
 
     // Programmer la phase de récupération
     const timeout = setTimeout(() => {
-      this._startRecoveryPhase(enemy, attackType, callbacks);
+      if (this.attackingEnemies.has(enemy.userData.id)) {
+        // Si le joueur n'a pas réagi, c'est un miss
+        if (this.awaitingPlayerResponse) {
+          if (DEBUG_CONFIG.LOG_TIMING) {
+            console.log(`⏰ Player missed - no reaction in time`);
+          }
+        }
+        this._startRecoveryPhase(enemy, attackType, callbacks);
+      }
     }, TIMING_CONFIG.ATTACK_EXECUTION_DURATION);
 
     this.phaseTimeouts.set(enemy.userData.id, timeout);
   }
 
   /**
-   * Phase 3: Récupération après l'attaque
+   * Phase 3: Récupération après l'attaque - 1.5 secondes
    */
   _startRecoveryPhase(enemy, attackType, callbacks) {
     this.currentPhase = ATTACK_PHASES.RECOVERY;
     this.phaseStartTime = performance.now();
+    this.awaitingPlayerResponse = false;
+
+    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+      console.log(`🔄 RECOVERY phase started - ${TIMING_CONFIG.ATTACK_RECOVERY_DURATION}ms`);
+    }
 
     // Effets visuels de récupération
     this._applyRecoveryVisuals(enemy, attackType);
@@ -117,7 +144,9 @@ class AttackPhaseService {
 
     // Programmer la fin de l'attaque
     const timeout = setTimeout(() => {
-      this._completeAttack(enemy, callbacks);
+      if (this.attackingEnemies.has(enemy.userData.id)) {
+        this._completeAttack(enemy, callbacks);
+      }
     }, TIMING_CONFIG.ATTACK_RECOVERY_DURATION);
 
     this.phaseTimeouts.set(enemy.userData.id, timeout);
@@ -129,6 +158,10 @@ class AttackPhaseService {
   _completeAttack(enemy, callbacks) {
     const enemyId = enemy.userData.id;
 
+    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+      console.log(`✅ Attack completed: Enemy ${enemyId}`);
+    }
+
     // Réinitialiser les visuels
     this._resetEnemyVisuals(enemy);
 
@@ -138,10 +171,8 @@ class AttackPhaseService {
 
     this.currentPhase = null;
     this.phaseStartTime = 0;
-
-    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
-      console.log(`Attack completed: Enemy ${enemyId}`);
-    }
+    this.awaitingPlayerResponse = false;
+    this.executionStartTime = 0;
 
     // Notifier la fin
     if (callbacks.onComplete) {
@@ -150,7 +181,66 @@ class AttackPhaseService {
   }
 
   /**
-   * Appliquer les effets visuels de préparation
+   * Évaluer le timing d'une action du joueur
+   * @param {number} actionTime - Temps de l'action du joueur
+   */
+  evaluatePlayerTiming(actionTime = performance.now()) {
+    if (!this.awaitingPlayerResponse || this.currentPhase !== ATTACK_PHASES.EXECUTION) {
+      if (DEBUG_CONFIG.LOG_TIMING) {
+        console.log(`❌ No valid attack to react to (phase: ${this.currentPhase}, awaiting: ${this.awaitingPlayerResponse})`);
+      }
+      return null;
+    }
+
+    const timeDiff = actionTime - this.executionStartTime;
+
+    if (DEBUG_CONFIG.LOG_TIMING) {
+      console.log(`⏱️  Player reacted in ${timeDiff}ms (Perfect: <${TIMING_CONFIG.PERFECT_WINDOW}ms, Good: <${TIMING_CONFIG.GOOD_WINDOW}ms)`);
+    }
+
+    let result;
+    if (timeDiff <= TIMING_CONFIG.PERFECT_WINDOW) {
+      result = {
+        quality: 'perfect',
+        timeDiff,
+        message: 'PARFAIT!',
+        success: true
+      };
+    } else if (timeDiff <= TIMING_CONFIG.GOOD_WINDOW) {
+      result = {
+        quality: 'good',
+        timeDiff,
+        message: 'Bien!',
+        success: true
+      };
+    } else if (timeDiff <= TIMING_CONFIG.TOTAL_ACTION_WINDOW) {
+      result = {
+        quality: 'late',
+        timeDiff,
+        message: 'En retard!',
+        success: false
+      };
+    } else {
+      result = {
+        quality: 'miss',
+        timeDiff,
+        message: 'Trop lent!',
+        success: false
+      };
+    }
+
+    // Marquer que le joueur a réagi
+    this.awaitingPlayerResponse = false;
+
+    if (DEBUG_CONFIG.LOG_TIMING) {
+      console.log(`📊 Timing result:`, result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Appliquer les effets visuels de préparation - Plus subtils
    */
   _applyPreparationVisuals(enemy, attackType) {
     if (!enemy || !enemy.material) return;
@@ -159,7 +249,7 @@ class AttackPhaseService {
       // Couleur selon le type d'attaque
       const color = this._getAttackTypeColor(attackType);
       
-      // Appliquer les matériaux de préparation
+      // Appliquer les matériaux de préparation - Plus subtils
       enemy.material.color.setHex(color);
       enemy.material.emissive.setHex(color);
       enemy.material.emissiveIntensity = ENEMY_CONFIG.MATERIALS.EMISSIVE_INTENSITY_PREPARATION;
@@ -169,13 +259,17 @@ class AttackPhaseService {
       enemy.userData.attackType = attackType;
       enemy.userData.attackPhase = ATTACK_PHASES.PREPARATION;
 
+      if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+        console.log(`🎨 Applied preparation visuals: ${attackType} -> color: ${color.toString(16)}`);
+      }
+
     } catch (error) {
       console.error('Error applying preparation visuals:', error);
     }
   }
 
   /**
-   * Appliquer les effets visuels d'exécution
+   * Appliquer les effets visuels d'exécution - Plus visible mais pas excessif
    */
   _applyExecutionVisuals(enemy, attackType) {
     if (!enemy || !enemy.material) return;
@@ -186,12 +280,16 @@ class AttackPhaseService {
       enemy.material.emissive.setHex(COLORS.ATTACK_EXECUTION);
       enemy.material.emissiveIntensity = ENEMY_CONFIG.MATERIALS.EMISSIVE_INTENSITY_EXECUTION;
 
-      // Agrandir l'ennemi
+      // Agrandir légèrement l'ennemi
       const scale = ENEMY_CONFIG.ANIMATION.EXECUTION_SCALE;
       enemy.scale.set(scale, scale, scale);
 
       // Mettre à jour la phase
       enemy.userData.attackPhase = ATTACK_PHASES.EXECUTION;
+
+      if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+        console.log(`🔥 Applied execution visuals: scale ${scale}, intensity ${ENEMY_CONFIG.MATERIALS.EMISSIVE_INTENSITY_EXECUTION}`);
+      }
 
     } catch (error) {
       console.error('Error applying execution visuals:', error);
@@ -210,11 +308,15 @@ class AttackPhaseService {
       enemy.material.emissive.setHex(COLORS.ATTACK_RECOVERY);
       enemy.material.emissiveIntensity = ENEMY_CONFIG.MATERIALS.EMISSIVE_INTENSITY_RECOVERY;
 
-      // Réduire légèrement la taille
+      // Réduire la taille
       enemy.scale.set(1, 1, 1);
 
       // Mettre à jour la phase
       enemy.userData.attackPhase = ATTACK_PHASES.RECOVERY;
+
+      if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+        console.log(`🌿 Applied recovery visuals`);
+      }
 
     } catch (error) {
       console.error('Error applying recovery visuals:', error);
@@ -241,6 +343,10 @@ class AttackPhaseService {
       enemy.userData.attackType = null;
       enemy.userData.attackPhase = null;
 
+      if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+        console.log(`🔄 Reset enemy visuals to default`);
+      }
+
     } catch (error) {
       console.error('Error resetting enemy visuals:', error);
     }
@@ -263,9 +369,7 @@ class AttackPhaseService {
   }
 
   /**
-   * Animer les ennemis en fonction de leur phase d'attaque
-   * @param {Array} enemies - Liste des ennemis
-   * @param {number} time - Temps de l'animation
+   * Animer les ennemis en fonction de leur phase d'attaque - Animations plus douces
    */
   animateAttackingEnemies(enemies, time) {
     enemies.forEach(enemy => {
@@ -289,40 +393,45 @@ class AttackPhaseService {
   }
 
   /**
-   * Animation de la phase de préparation
+   * Animation de la phase de préparation - Plus douce
    */
   _animatePreparation(enemy, time, originalPos) {
-    // Pulsation douce
+    // Pulsation très douce
     const pulseSpeed = ENEMY_CONFIG.ANIMATION.PREPARATION_PULSE_SPEED;
     const amplitude = ENEMY_CONFIG.ANIMATION.PREPARATION_SCALE_AMPLITUDE;
     const pulse = Math.sin(time * pulseSpeed) * amplitude;
     const scale = 1 + pulse;
     
     enemy.scale.set(scale, scale, scale);
+    
+    // Garder la position d'origine
+    enemy.position.copy(originalPos);
   }
 
   /**
-   * Animation de la phase d'exécution
+   * Animation de la phase d'exécution - Plus marquée
    */
   _animateExecution(enemy, time, originalPos) {
-    // Mouvement vers le centre (attaque)
+    // Mouvement vers le centre (attaque) - Plus lent
     const direction = originalPos.clone().negate().normalize();
-    const distance = 0.8;
+    const distance = 0.6; // Un peu moins
+    const progress = Math.sin(time * 4) * 0.5 + 0.5; // Oscillation plus lente
     
-    enemy.position.x = originalPos.x + direction.x * distance;
-    enemy.position.z = originalPos.z + direction.z * distance;
+    enemy.position.x = originalPos.x + direction.x * distance * progress;
+    enemy.position.z = originalPos.z + direction.z * distance * progress;
   }
 
   /**
-   * Animation de la phase de récupération
+   * Animation de la phase de récupération - Retour progressif
    */
   _animateRecovery(enemy, time, originalPos) {
-    // Retour progressif à la position originale
+    // Retour progressif et lent à la position originale
     const fadeSpeed = ENEMY_CONFIG.ANIMATION.RECOVERY_FADE_SPEED;
-    const progress = Math.min(1, (time * fadeSpeed) % 1);
+    const progress = Math.min(1, (time * fadeSpeed) % 2); // Plus lent
+    const smoothProgress = progress * 0.05; // Très progressif
     
-    enemy.position.x = enemy.position.x + (originalPos.x - enemy.position.x) * progress * 0.1;
-    enemy.position.z = enemy.position.z + (originalPos.z - enemy.position.z) * progress * 0.1;
+    enemy.position.x = enemy.position.x + (originalPos.x - enemy.position.x) * smoothProgress;
+    enemy.position.z = enemy.position.z + (originalPos.z - enemy.position.z) * smoothProgress;
   }
 
   /**
@@ -335,6 +444,10 @@ class AttackPhaseService {
     }
     
     this.attackingEnemies.delete(enemyId);
+    
+    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+      console.log(`🚫 Cancelled attack for enemy ${enemyId}`);
+    }
   }
 
   /**
@@ -349,6 +462,12 @@ class AttackPhaseService {
     this.attackingEnemies.clear();
     this.currentPhase = null;
     this.phaseStartTime = 0;
+    this.awaitingPlayerResponse = false;
+    this.executionStartTime = 0;
+    
+    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+      console.log(`🚫 Cancelled all attacks`);
+    }
   }
 
   /**
@@ -371,6 +490,26 @@ class AttackPhaseService {
   getPhaseElapsedTime() {
     if (!this.currentPhase) return 0;
     return performance.now() - this.phaseStartTime;
+  }
+
+  /**
+   * Vérifier si le joueur peut actuellement réagir
+   */
+  canPlayerReact() {
+    return this.awaitingPlayerResponse && this.currentPhase === ATTACK_PHASES.EXECUTION;
+  }
+
+  /**
+   * Obtenir des informations de debug
+   */
+  getDebugInfo() {
+    return {
+      currentPhase: this.currentPhase,
+      attackingEnemies: Array.from(this.attackingEnemies),
+      awaitingPlayerResponse: this.awaitingPlayerResponse,
+      phaseElapsedTime: this.getPhaseElapsedTime(),
+      canPlayerReact: this.canPlayerReact()
+    };
   }
 }
 
