@@ -29,8 +29,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-gl",
-      "expo-gl-cpp"
+      "expo-gl"
     ]
   }
 }
