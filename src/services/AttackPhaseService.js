@@ -8,7 +8,7 @@ import {
 } from '../utils/Constants';
 
 /**
- * Service de gestion des phases d'attaque - VERSION CORRIGÉE
+ * Service de gestion des phases d'attaque - VERSION CORRIGÉE FEINTE
  * Responsabilité unique : Gestion des phases visuelles et timing des attaques
  */
 class AttackPhaseService {
@@ -19,6 +19,7 @@ class AttackPhaseService {
     this.attackingEnemies = new Set();
     this.awaitingPlayerResponse = false;
     this.executionStartTime = 0;
+    this.currentAttackType = null; // Ajouté pour tracker le type d'attaque
   }
 
   /**
@@ -37,6 +38,7 @@ class AttackPhaseService {
 
     const enemyId = enemy.userData.id;
     this.attackingEnemies.add(enemyId);
+    this.currentAttackType = attackType; // Sauvegarder le type
 
     if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
       console.log(`🎯 Starting attack: Enemy ${enemyId}, Type: ${attackType}`);
@@ -82,16 +84,24 @@ class AttackPhaseService {
   }
 
   /**
-   * Phase 2: Exécution de l'attaque - 2 secondes pour réagir
+   * Phase 2: Exécution de l'attaque - LOGIQUE FEINTE CORRIGÉE
    */
   _startExecutionPhase(enemy, attackType, callbacks) {
     this.currentPhase = ATTACK_PHASES.EXECUTION;
     this.phaseStartTime = performance.now();
     this.executionStartTime = performance.now();
-    this.awaitingPlayerResponse = true;
 
-    if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
-      console.log(`⚡ EXECUTION phase started - ${TIMING_CONFIG.ATTACK_EXECUTION_DURATION}ms to react!`);
+    // CORRECTION FEINTE: Pour les feintes, pas besoin d'attendre une réaction
+    if (attackType === ATTACK_TYPES.FEINT) {
+      this.awaitingPlayerResponse = false;
+      if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+        console.log(`🎭 FEINT execution - no player response needed`);
+      }
+    } else {
+      this.awaitingPlayerResponse = true;
+      if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
+        console.log(`⚡ EXECUTION phase started - ${TIMING_CONFIG.ATTACK_EXECUTION_DURATION}ms to react!`);
+      }
     }
 
     // Effets visuels d'exécution
@@ -109,8 +119,13 @@ class AttackPhaseService {
     // Programmer la phase de récupération
     const timeout = setTimeout(() => {
       if (this.attackingEnemies.has(enemy.userData.id)) {
-        // Si le joueur n'a pas réagi, c'est un miss
-        if (this.awaitingPlayerResponse) {
+        // CORRECTION FEINTE: Si c'est une feinte et que le joueur n'a pas bougé = SUCCÈS
+        if (attackType === ATTACK_TYPES.FEINT && this.awaitingPlayerResponse === false) {
+          if (DEBUG_CONFIG.LOG_TIMING) {
+            console.log(`✅ Feint successful - player correctly did nothing`);
+          }
+          // Pas de dégâts pour feinte réussie
+        } else if (this.awaitingPlayerResponse) {
           if (DEBUG_CONFIG.LOG_TIMING) {
             console.log(`⏰ Player missed - no reaction in time`);
           }
@@ -173,6 +188,7 @@ class AttackPhaseService {
     this.phaseStartTime = 0;
     this.awaitingPlayerResponse = false;
     this.executionStartTime = 0;
+    this.currentAttackType = null;
 
     // Notifier la fin
     if (callbacks.onComplete) {
@@ -181,10 +197,26 @@ class AttackPhaseService {
   }
 
   /**
-   * Évaluer le timing d'une action du joueur
+   * Évaluer le timing d'une action du joueur - LOGIQUE FEINTE CORRIGÉE
    * @param {number} actionTime - Temps de l'action du joueur
    */
   evaluatePlayerTiming(actionTime = performance.now()) {
+    // CORRECTION FEINTE: Si c'est une feinte, toute action = échec
+    if (this.currentAttackType === ATTACK_TYPES.FEINT) {
+      if (DEBUG_CONFIG.LOG_TIMING) {
+        console.log(`❌ Player reacted to FEINT - should have done nothing!`);
+      }
+      
+      this.awaitingPlayerResponse = false;
+      return {
+        quality: 'wrong_action',
+        timeDiff: 0,
+        message: 'Ne bougez pas sur les feintes!',
+        success: false,
+        isFeintFail: true
+      };
+    }
+
     if (!this.awaitingPlayerResponse || this.currentPhase !== ATTACK_PHASES.EXECUTION) {
       if (DEBUG_CONFIG.LOG_TIMING) {
         console.log(`❌ No valid attack to react to (phase: ${this.currentPhase}, awaiting: ${this.awaitingPlayerResponse})`);
@@ -237,6 +269,27 @@ class AttackPhaseService {
     }
 
     return result;
+  }
+
+  /**
+   * Évaluer une feinte réussie (appelée quand l'exécution se termine sans action)
+   */
+  evaluateFeintSuccess() {
+    if (this.currentAttackType === ATTACK_TYPES.FEINT && this.currentPhase === ATTACK_PHASES.EXECUTION) {
+      if (DEBUG_CONFIG.LOG_TIMING) {
+        console.log(`✅ Feint avoided successfully - player did nothing`);
+      }
+      
+      return {
+        quality: 'perfect',
+        timeDiff: 0,
+        message: 'Feinte évitée!',
+        success: true,
+        isFeintSuccess: true
+      };
+    }
+    
+    return null;
   }
 
   /**
@@ -464,6 +517,7 @@ class AttackPhaseService {
     this.phaseStartTime = 0;
     this.awaitingPlayerResponse = false;
     this.executionStartTime = 0;
+    this.currentAttackType = null;
     
     if (DEBUG_CONFIG.LOG_ATTACK_PHASES) {
       console.log(`🚫 Cancelled all attacks`);
@@ -500,11 +554,19 @@ class AttackPhaseService {
   }
 
   /**
+   * Obtenir le type d'attaque actuel
+   */
+  getCurrentAttackType() {
+    return this.currentAttackType;
+  }
+
+  /**
    * Obtenir des informations de debug
    */
   getDebugInfo() {
     return {
       currentPhase: this.currentPhase,
+      currentAttackType: this.currentAttackType,
       attackingEnemies: Array.from(this.attackingEnemies),
       awaitingPlayerResponse: this.awaitingPlayerResponse,
       phaseElapsedTime: this.getPhaseElapsedTime(),
