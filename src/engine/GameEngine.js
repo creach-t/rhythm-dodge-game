@@ -1,6 +1,7 @@
 import { GAME_CONFIG, ATTACK_TYPES, DEFENSE_ACTIONS, GAME_STATES } from '../utils/Constants';
 import { getCurrentTime } from '../utils/TimeUtils';
 import AttackSequencer from '../systems/AttackSequencer';
+import { handlePlayerTurn } from './PlayerTurn.js';
 
 /**
  * Moteur principal du jeu - Version simplifiée pour éviter les erreurs d'import
@@ -50,23 +51,28 @@ class GameEngine {
 
   startNewRound() {
     console.log(`GameEngine: Starting round ${this.gameState.currentRound}`);
-    
-    try {
-      // Générer une nouvelle séquence d'attaques
-      this.currentAttackSequence = this.attackSequencer.generateSequence(
-        GAME_CONFIG.ENEMIES.MAX_COUNT,
-        this.gameState.currentRound
-      );
-      
-      console.log('Generated attack sequence:', this.currentAttackSequence);
-      
-      // Démarrer la séquence
-      setTimeout(() => {
-        this.startAttackSequence();
-      }, 500);
-    } catch (error) {
-      console.error('Error starting new round:', error);
-    }
+
+    // On lance d'abord la phase joueur (soin ou attaque)
+    handlePlayerTurn({
+      player: this.player,        // Ton objet joueur
+      enemyGroup: this.scene,     // Ennemis dans la scène
+      onComplete: () => {
+        // Une fois que le joueur a joué, on démarre la séquence ennemie
+        try {
+          this.currentAttackSequence = this.attackSequencer.generateSequence(
+            GAME_CONFIG.ENEMIES.MAX_COUNT,
+            this.gameState.currentRound
+          );
+          console.log('Generated attack sequence:', this.currentAttackSequence);
+
+          setTimeout(() => {
+            this.startAttackSequence();
+          }, 500);
+        } catch (error) {
+          console.error('Error starting new round:', error);
+        }
+      }
+    });
   }
 
   startAttackSequence() {
@@ -242,7 +248,7 @@ class GameEngine {
       } else {
         this.gameState.combo = 0;
         // Réduire la santé en cas d'échec
-        this.gameState.health = Math.max(0, this.gameState.health - 10);
+        this.gameState.health = Math.max(0, this.gameState.health);
       }
 
       // Vérifier game over

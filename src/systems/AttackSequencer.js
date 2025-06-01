@@ -1,4 +1,4 @@
-import { ATTACK_TYPES, GAME_CONFIG } from '../utils/Constants';
+import { ATTACK_TYPES, GAME_CONFIG, TIMING } from '../utils/Constants';
 import { randomInt, randomChoice } from '../utils/MathUtils';
 
 /**
@@ -11,17 +11,17 @@ class AttackSequencer {
       beginner: [
         { type: ATTACK_TYPES.NORMAL, weight: 70 },
         { type: ATTACK_TYPES.HEAVY, weight: 20 },
-        { type: ATTACK_TYPES.FEINT, weight: 10 }
+        { type: ATTACK_TYPES.FEINT, weight: 0 }
       ],
       intermediate: [
         { type: ATTACK_TYPES.NORMAL, weight: 50 },
         { type: ATTACK_TYPES.HEAVY, weight: 35 },
-        { type: ATTACK_TYPES.FEINT, weight: 15 }
+        { type: ATTACK_TYPES.FEINT, weight: 0 }
       ],
       advanced: [
         { type: ATTACK_TYPES.NORMAL, weight: 40 },
         { type: ATTACK_TYPES.HEAVY, weight: 40 },
-        { type: ATTACK_TYPES.FEINT, weight: 20 }
+        { type: ATTACK_TYPES.FEINT, weight: 0 }
       ]
     };
 
@@ -183,7 +183,7 @@ class AttackSequencer {
     // Commence avec 3 attaques, augmente progressivement
     const baseLength = 3;
     const increaseRate = Math.floor(round / 3); // +1 tous les 3 rounds
-    const maxLength = 8; // Limite maximale
+    const maxLength = 3; // Limite maximale
     
     return Math.min(baseLength + increaseRate, maxLength);
   }
@@ -192,12 +192,14 @@ class AttackSequencer {
    * Calcule le timing pour chaque attaque dans la séquence
    */
   calculateAttackTiming(attackIndex, round) {
-    const baseTiming = GAME_CONFIG.TIMING.ATTACK_TELEGRAPH;
-    const comboDelay = GAME_CONFIG.TIMING.COMBO_TIMEOUT;
-    
-    // Plus le round est élevé, plus les attaques sont rapides
-    const speedMultiplier = Math.max(0.6, 1 - (round * 0.05));
-    
+    const baseTiming = TIMING.ATTACK_TELEGRAPH;
+    const comboDelay = TIMING.COMBO_TIMEOUT;
+
+    const speedMultiplier = Math.max(
+      TIMING.MIN_SPEED_MULTIPLIER,
+      1 - Math.log2(round + 1) * TIMING.SPEED_LOG_FACTOR
+    );
+
     return {
       telegraph: baseTiming * speedMultiplier,
       delay: comboDelay * speedMultiplier,

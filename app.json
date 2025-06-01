@@ -6,7 +6,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "rhythm-dodge-game",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#1a1a1a"
@@ -29,6 +33,9 @@
     },
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

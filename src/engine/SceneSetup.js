@@ -52,13 +52,13 @@ export const setupLighting = (scene) => {
 export const createGround = () => {
   const groundGeometry = new THREE.CircleGeometry(15, 32);
   const groundMaterial = new THREE.MeshPhongMaterial({ 
-    color: 0x333333,
+    color: 0x33ee11,
     emissive: 0x111111,
     shininess: 10
   });
   const ground = new THREE.Mesh(groundGeometry, groundMaterial);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.1;
+  ground.position.y = -0.3;
   ground.receiveShadow = true;
   ground.name = 'ground';
   return ground;
@@ -86,7 +86,7 @@ export const createPlayer = () => {
   const player = new THREE.Mesh(playerGeometry, playerMaterial);
   player.position.set(
     GAME_CONFIG.PLAYER.POSITION.x,
-    GAME_CONFIG.PLAYER.SIZE * 0.75,
+    GAME_CONFIG.PLAYER.SIZE * 0.50,
     GAME_CONFIG.PLAYER.POSITION.z
   );
   player.castShadow = true;

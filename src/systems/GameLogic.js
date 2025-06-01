@@ -6,6 +6,8 @@ export class GameLogic {
     this.awaitingAction = false;
     this.expectedAction = null;
     this.attackStartTime = 0;
+    this.playerHealth = 100;
+    this.enemyHealth = 20;
   }
 
   triggerAttack(enemyId, attackType) {
@@ -30,6 +32,23 @@ export class GameLogic {
     this.attackStartTime = Date.now();
     
     return true;
+  }
+
+    playerTurn(playerChoice) {
+    // playerChoice est un objet { action: 'attack'|'heal', targetId? }
+
+    if (playerChoice.action === 'heal') {
+      this.playerHealth = Math.min(100, this.playerHealth + 30);
+      return { message: 'Vous vous soignez de 30 points de vie', playerHealth: this.playerHealth };
+    }
+
+    if (playerChoice.action === 'attack') {
+      // Simple attaque sur ennemi ciblé
+      this.enemyHealth = Math.max(0, this.enemyHealth - 20);
+      return { message: `Vous attaquez l'ennemi ${playerChoice.targetId}`, enemyHealth: this.enemyHealth };
+    }
+
+    return { message: 'Action inconnue' };
   }
 
   checkPlayerAction(action) {

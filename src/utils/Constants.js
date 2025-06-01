@@ -1,8 +1,6 @@
 // Configuration du jeu
 export const GAME_CONFIG = {
   // Écran et rendu
-  CANVAS_WIDTH: 400,
-  CANVAS_HEIGHT: 800,
   TARGET_FPS: 60,
   
   // Caméra 3D - Ajustée pour vue portrait
@@ -10,7 +8,7 @@ export const GAME_CONFIG = {
     FOV: 60,
     NEAR: 0.1,
     FAR: 1000,
-    POSITION: { x: 0, y: 12, z: 8 },  // Plus éloignée et plus haute
+    POSITION: { x: 0, y: 14, z: 25 },  // Plus éloignée et plus haute
     LOOK_AT: { x: 0, y: 0, z: 0 }
   },
   
@@ -21,19 +19,19 @@ export const GAME_CONFIG = {
     SIZE: 1.2
   },
   
-  // Ennemis - Repositionnés pour être plus visibles
+  // Ennemis
   ENEMIES: {
     MAX_COUNT: 3,
-    SPAWN_RADIUS: 5,  // Plus près du joueur
-    SIZE: 1.5,        // Plus gros
-    COLORS: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffd93d']
+    SPAWN_RADIUS: 5,
+    SIZE: 1.5,
+    COLORS: ['#D3D3D3', '#D3D3D3', '#D3D3D3', '#D3D3D3'], // Couleurs plus vives
   },
   
   // Système de timing
   TIMING: {
     PERFECT_WINDOW: 100,    // ms pour timing parfait
     GOOD_WINDOW: 250,       // ms pour bon timing
-    ATTACK_TELEGRAPH: 1000, // ms avant l'attaque
+    ATTACK_TELEGRAPH: 2000, // ms avant l'attaque
     COMBO_TIMEOUT: 2000     // ms timeout entre attaques
   },
   
@@ -50,14 +48,29 @@ export const GAME_CONFIG = {
     DODGE: 'dodge',      // Bouton droite
     PARRY: 'parry'       // Bouton gauche
   },
+
+  ATTACK_SEQUENCE_1: [
+    { enemyId: 0, type: 'normal', delay: 0 },
+    { enemyId: 0, type: 'normal', delay: 3000 },
+    { enemyId: 0, type: 'normal', delay: 6000 },
+    { enemyId: 0, type: 'heavy', delay: 9000 },
+
+  ],
   
   // Score
   SCORE: {
     PERFECT_HIT: 100,
     GOOD_HIT: 50,
-    MISS_PENALTY: -25,
-    WRONG_ACTION_PENALTY: -50
+    MISS_PENALTY: 0,
+    WRONG_ACTION_PENALTY: 0
   }
+};
+
+export const TIMING = {
+  ATTACK_TELEGRAPH: 1000,        // Durée de l'avertissement visuel/sonore avant l'attaque (ms)
+  COMBO_TIMEOUT: 800,            // Temps entre deux attaques dans un combo (ms)
+  MIN_SPEED_MULTIPLIER: 0.80,    // Vitesse minimale autorisée (évite que ça devienne injouable)
+  SPEED_LOG_FACTOR: 0.08         // Facteur de réduction logarithmique de la vitesse selon le round
 };
 
 // Couleurs du thème
@@ -78,7 +91,7 @@ export const COLORS = {
 export const BUTTON_CONFIG = {
   SIZE: 90,
   MARGIN: 30,
-  BORDER_RADIUS: 45,
+  BORDER_RADIUS: 20,
   ACTIVE_SCALE: 0.9,
   FEEDBACK_DURATION: 150
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Animated } from 'react-native';
 import { COLORS, BUTTON_CONFIG } from '../utils/Constants';
 import GameButton from './GameButton';
 
@@ -10,7 +10,9 @@ const GameUI = ({
   gameState = 'playing',
   expectedAction = null,
   onDodge,
-  onParry
+  onParry,
+  resultMessage,
+  fadeAnim,
 }) => {
   // Déterminer les couleurs des boutons selon l'action attendue
   const getButtonColor = (buttonType) => {
@@ -68,6 +70,11 @@ const GameUI = ({
               </View>
             )}
           </View>
+                {resultMessage ? (
+        <Animated.View style={[styles.resultMessageContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.resultMessageText}>{resultMessage}</Text>
+        </Animated.View>
+      ) : null}
         </SafeAreaView>
       </View>
 
@@ -167,6 +174,29 @@ const styles = StyleSheet.create({
   comboText: {
     color: COLORS.WARNING,
     fontSize: 20,
+  },
+  container: {
+    flex: 1,
+  },
+  resultMessageContainer: {
+    position: 'absolute',
+    top: '500%',
+    left: '50%',
+    transform: [{ translateX: -150 }, { translateY: -20 }], // centre approx. selon largeur/hauteur du texte
+    width: 300,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  resultMessageText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   healthBar: {
     width: 100,
