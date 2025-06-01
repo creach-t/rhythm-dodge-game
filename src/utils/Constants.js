@@ -20,7 +20,7 @@ export const TURN_STATES = {
 // Attack Phases
 export const ATTACK_PHASES = {
   PREPARATION: 'preparation',    // Visual warning, enemy glows
-  EXECUTION: 'execution',       // Attack happens
+  EXECUTION: 'execution',       // Attack happens - player must react
   RECOVERY: 'recovery'          // Brief pause after attack
 };
 
@@ -175,22 +175,22 @@ export const ENEMY_CONFIG = {
     ROTATION_SPEED: 0.5,
     HOVER_SPEED: 2.0,
     HOVER_AMPLITUDE: 0.3,
-    PREPARATION_PULSE_SPEED: 3.0,
-    PREPARATION_SCALE_AMPLITUDE: 0.2,
-    EXECUTION_SCALE: 1.3,
-    RECOVERY_FADE_SPEED: 2.0
+    PREPARATION_PULSE_SPEED: 2.0,     // Plus lent
+    PREPARATION_SCALE_AMPLITUDE: 0.1,  // Plus subtil
+    EXECUTION_SCALE: 1.2,             // Plus subtil
+    RECOVERY_FADE_SPEED: 1.0          // Plus lent
   },
   MATERIALS: {
     EMISSIVE_INTENSITY_DEFAULT: 0.2,
-    EMISSIVE_INTENSITY_PREPARATION: 0.6,
-    EMISSIVE_INTENSITY_EXECUTION: 1.0,
+    EMISSIVE_INTENSITY_PREPARATION: 0.4,  // Plus subtil
+    EMISSIVE_INTENSITY_EXECUTION: 0.8,    // Plus subtil
     EMISSIVE_INTENSITY_RECOVERY: 0.1,
     SHININESS: 100
   }
 };
 
 // ============================================================================
-// TIMING & GAMEPLAY CONFIGURATION
+// TIMING & GAMEPLAY CONFIGURATION - CORRIGÉ
 // ============================================================================
 
 // Core Timing Settings
@@ -199,21 +199,22 @@ export const TIMING_CONFIG = {
   
   // Turn-based Timing
   TURN_TRANSITION_DURATION: 1000,
-  PLAYER_TURN_DURATION: 5000,  // 5 seconds to choose action
+  PLAYER_TURN_DURATION: 8000,  // 8 secondes pour choisir
   
-  // Attack Phase Timing
-  ATTACK_PREPARATION_DURATION: 2000,  // 2 seconds warning
-  ATTACK_EXECUTION_DURATION: 500,     // 0.5 seconds attack window
-  ATTACK_RECOVERY_DURATION: 1000,     // 1 second recovery
+  // Attack Phase Timing - RALENTI
+  ATTACK_PREPARATION_DURATION: 3000,  // 3 secondes de préparation
+  ATTACK_EXECUTION_DURATION: 2000,    // 2 secondes pour réagir
+  ATTACK_RECOVERY_DURATION: 1500,     // 1.5 secondes de récupération
   
-  // Action Windows (in milliseconds)
-  PERFECT_WINDOW: 100,      // Perfect timing window
-  GOOD_WINDOW: 250,         // Good timing window
+  // Action Windows (in milliseconds) - PLUS GÉNÉREUX
+  PERFECT_WINDOW: 500,      // 500ms pour timing parfait
+  GOOD_WINDOW: 1000,        // 1000ms pour bon timing
+  TOTAL_ACTION_WINDOW: 2000, // 2 secondes totales pour réagir
   
   // Round Timing
-  ROUND_START_DELAY: 1000,
-  ROUND_END_DELAY: 2000,
-  ACTION_RESULT_DISPLAY: 1500,
+  ROUND_START_DELAY: 2000,
+  ROUND_END_DELAY: 3000,
+  ACTION_RESULT_DISPLAY: 2000,
   
   // Speed Scaling
   MIN_SPEED_MULTIPLIER: 0.80,
@@ -235,7 +236,7 @@ export const SCORE_CONFIG = {
 // Health System
 export const HEALTH_CONFIG = {
   MAX_HEALTH: 100,
-  DAMAGE_ON_MISS: 20,
+  DAMAGE_ON_MISS: 15,
   DAMAGE_ON_WRONG_ACTION: 10,
   HEALING_PER_PERFECT: 0,
   CRITICAL_HEALTH_THRESHOLD: 20,
@@ -247,7 +248,7 @@ export const HEALTH_CONFIG = {
 };
 
 // ============================================================================
-// ATTACK SEQUENCES CONFIGURATION
+// ATTACK SEQUENCES CONFIGURATION - PLUS ESPACÉES
 // ============================================================================
 
 // Predefined Attack Sequences
@@ -256,8 +257,8 @@ export const ATTACK_SEQUENCES = {
     name: "Tutorial Sequence",
     attacks: [
       { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
-      { enemyId: 1, type: ATTACK_TYPES.HEAVY, delay: 0 },
-      { enemyId: 2, type: ATTACK_TYPES.FEINT, delay: 0 }
+      { enemyId: 1, type: ATTACK_TYPES.HEAVY, delay: 8000 },   // 8 secondes entre attaques
+      { enemyId: 2, type: ATTACK_TYPES.FEINT, delay: 16000 }   // 16 secondes
     ]
   },
   
@@ -265,8 +266,8 @@ export const ATTACK_SEQUENCES = {
     name: "Basic Combo",
     attacks: [
       { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
-      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 500 },
-      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 1000 }
+      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 7000 },  // 7 secondes
+      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 14000 }   // 14 secondes
     ]
   },
   
@@ -274,30 +275,26 @@ export const ATTACK_SEQUENCES = {
     name: "Mixed Assault",
     attacks: [
       { enemyId: 0, type: ATTACK_TYPES.FEINT, delay: 0 },
-      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 300 },
-      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 600 },
-      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 1200 }
+      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 6000 },  // 6 secondes
+      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 12000 },  // 12 secondes
+      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 18000 }  // 18 secondes
     ]
   },
   
-  ADVANCED_PATTERN: {
-    name: "Advanced Pattern",
+  SIMPLE_TEST: {
+    name: "Simple Test",
     attacks: [
-      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 },
-      { enemyId: 1, type: ATTACK_TYPES.FEINT, delay: 200 },
-      { enemyId: 2, type: ATTACK_TYPES.HEAVY, delay: 400 },
-      { enemyId: 1, type: ATTACK_TYPES.NORMAL, delay: 800 },
-      { enemyId: 0, type: ATTACK_TYPES.HEAVY, delay: 1000 }
+      { enemyId: 0, type: ATTACK_TYPES.NORMAL, delay: 0 }      // Une seule attaque pour tester
     ]
   }
 };
 
-// Round-based sequence selection
+// Round-based sequence selection - COMMENCE PAR LE TEST
 export const ROUND_SEQUENCES = {
-  1: 'TUTORIAL',
-  2: 'BASIC_COMBO',
-  3: 'MIXED_ASSAULT',
-  4: 'ADVANCED_PATTERN',
+  1: 'SIMPLE_TEST',
+  2: 'TUTORIAL',
+  3: 'BASIC_COMBO',
+  4: 'MIXED_ASSAULT',
   // Round 5+ uses random selection from all patterns
 };
 
@@ -308,8 +305,8 @@ export const ROUND_SEQUENCES = {
 // Difficulty Progression
 export const DIFFICULTY_CONFIG = {
   ROUND_SCALING: {
-    SPEED_INCREASE_PER_ROUND: 0.1,
-    MAX_SPEED_MULTIPLIER: 2.0,
+    SPEED_INCREASE_PER_ROUND: 0.05,  // Plus lent
+    MAX_SPEED_MULTIPLIER: 1.5,       // Limite plus basse
     DAMAGE_INCREASE_PER_ROUND: 2,
     ENEMY_HEALTH_INCREASE: 10
   },
@@ -386,13 +383,14 @@ export const UI_CONFIG = {
 // ============================================================================
 
 export const DEBUG_CONFIG = {
-  ENABLE_LOGGING: __DEV__ || false,
-  LOG_FRAME_COUNT: 60, // Log every N frames
+  ENABLE_LOGGING: true,  // Activé pour débugger
+  LOG_FRAME_COUNT: 120,  // Log moins souvent
   SHOW_FPS: __DEV__ || false,
   SHOW_WIREFRAMES: false,
   ENABLE_STATS: __DEV__ || false,
   LOG_ATTACK_PHASES: true,
-  LOG_TURN_CHANGES: true
+  LOG_TURN_CHANGES: true,
+  LOG_TIMING: true       // Nouveau: log des timings
 };
 
 // ============================================================================
