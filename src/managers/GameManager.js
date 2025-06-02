@@ -1,17 +1,19 @@
 import { GAME_CONFIG } from '../utils/Constants';
-import { GameLogic } from '../systems/GameLogic';
-import { createGround, createGrid, createPlayer } from '../engine/SceneSetup';
+import { CombatSystem } from '../systems/CombatSystem';
+import { createGround, createGrid } from '../engine/SceneSetup';
 
 /**
  * Gestionnaire principal du jeu
  */
 export class GameManager {
-  constructor(stateManager, sceneManager, enemyManager) {
+  constructor(stateManager, sceneManager, enemyManager, playerManager) {
     this.stateManager = stateManager;
     this.sceneManager = sceneManager;
     this.enemyManager = enemyManager;
-    this.gameLogic = new GameLogic();
+    this.playerManager = playerManager;
+    this.combatSystem = new CombatSystem();
     this.attackTimeoutId = null;
+    this.currentAttackType = null;
   }
 
   /**
@@ -23,9 +25,9 @@ export class GameManager {
     // Ajouter les éléments de base à la scène
     this.sceneManager.addObject(createGround());
     this.sceneManager.addObject(createGrid());
-    this.sceneManager.addObject(createPlayer());
     
-    // Initialiser les ennemis
+    // Initialiser le joueur et les ennemis
+    this.playerManager.initialize();
     this.enemyManager.initialize();
     
     // Démarrer la boucle de rendu
@@ -43,6 +45,7 @@ export class GameManager {
   update() {
     const time = Date.now() * 0.001;
     this.enemyManager.update(time);
+    this.playerManager.update(time);
   }
 
   /**
@@ -57,28 +60,32 @@ export class GameManager {
    * Déclenche une attaque aléatoire
    */
   triggerRandomAttack() {
-    if (this.gameLogic.awaitingAction) return;
+    if (this.currentAttackType !== null) return;
     if (!this.stateManager.isPlaying()) return;
     
     this.stateManager.setResultMessage('');
 
     try {
       const enemyId = this.enemyManager.getRandomEnemyId();
-      const attackType = this.gameLogic.getRandomAttack();
+      const attackType = this.combatSystem.getRandomAttackType();
+      this.currentAttackType = attackType;
       
       console.log(`Enemy ${enemyId} attacks with ${attackType}`);
       
-      if (this.gameLogic.triggerAttack(enemyId, attackType)) {
-        this.enemyManager.activateAttack(enemyId, attackType);
-        this.stateManager.setExpectedAction(this.gameLogic.expectedAction);
-        
-        // Timeout après 4 secondes
-        this.attackTimeoutId = setTimeout(() => {
-          if (this.gameLogic.awaitingAction) {
-            this.handleMissedAction();
-          }
-        }, 4000);
-      }
+      // Activer l'attaque visuelle
+      this.enemyManager.activateAttack(enemyId, attackType);
+      
+      // Définir l'action attendue
+      const expectedAction = this.combatSystem.getExpectedAction(attackType);
+      this.stateManager.setExpectedAction(expectedAction);
+      
+      // Timeout après 4 secondes
+      this.attackTimeoutId = setTimeout(() => {
+        if (this.currentAttackType !== null) {
+          this.handleMissedAction();
+        }
+      }, 4000);
+      
     } catch (error) {
       console.error('Error triggering attack:', error);
     }
@@ -89,13 +96,11 @@ export class GameManager {
    */
   handleMissedAction() {
     console.log('Player missed the action!');
-    this.enemyManager.resetAll();
+    this.resetAttack();
     
     // Appliquer les dégâts
     this.stateManager.takeDamage(10);
-    this.stateManager.setExpectedAction(null);
-    
-    this.gameLogic.reset();
+    this.stateManager.setResultMessage("Trop tard !");
     
     // Continuer le jeu si le joueur est encore en vie
     if (this.stateManager.isPlaying()) {
@@ -109,21 +114,29 @@ export class GameManager {
    * Gère l'action du joueur
    */
   handlePlayerAction(action) {
-    const result = this.gameLogic.checkPlayerAction(action);
-    if (!result) return;
+    if (this.currentAttackType === null) return;
     
-    console.log(`Action result: ${result.message} (${result.points} points)`);
+    // Vérifier l'action
+    const result = this.combatSystem.checkPlayerAction(this.currentAttackType, action);
+    const points = this.combatSystem.calculatePoints(result.isCorrect, this.stateManager.getState().combo);
+    const message = this.combatSystem.getResultMessage(result.isCorrect, this.currentAttackType, action);
     
-    // Annuler le timeout d'attaque
-    if (this.attackTimeoutId) {
-      clearTimeout(this.attackTimeoutId);
-      this.attackTimeoutId = null;
+    console.log(`Action result: ${message} (${points} points)`);
+    
+    // Animer le joueur
+    this.playerManager.performDefense(action);
+    
+    // Réinitialiser l'attaque
+    this.resetAttack();
+    
+    // Mettre à jour l'état
+    this.stateManager.updateScore(points);
+    this.stateManager.setResultMessage(message);
+    
+    // Appliquer des dégâts si mauvaise action
+    if (!result.isCorrect) {
+      this.stateManager.takeDamage(5);
     }
-    
-    this.enemyManager.resetAll();
-    this.stateManager.updateScore(result.points);
-    this.stateManager.setExpectedAction(null);
-    this.stateManager.setResultMessage(result.message);
     
     // Continuer le jeu si le joueur est encore en vie
     if (this.stateManager.isPlaying()) {
@@ -134,10 +147,25 @@ export class GameManager {
   }
 
   /**
+   * Réinitialise l'attaque en cours
+   */
+  resetAttack() {
+    if (this.attackTimeoutId) {
+      clearTimeout(this.attackTimeoutId);
+      this.attackTimeoutId = null;
+    }
+    
+    this.currentAttackType = null;
+    this.enemyManager.resetAll();
+    this.stateManager.setExpectedAction(null);
+  }
+
+  /**
    * Gère la fin du jeu
    */
   handleGameOver() {
     console.log('Game Over!');
+    this.resetAttack();
     this.sceneManager.stopRenderLoop();
   }
 
@@ -145,9 +173,8 @@ export class GameManager {
    * Nettoie les ressources
    */
   dispose() {
-    if (this.attackTimeoutId) {
-      clearTimeout(this.attackTimeoutId);
-    }
+    this.resetAttack();
+    this.playerManager.dispose();
     this.enemyManager.dispose();
     this.sceneManager.dispose();
   }
