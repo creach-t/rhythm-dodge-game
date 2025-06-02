@@ -10,7 +10,8 @@ const GameButton = ({
   style = {},
   testID,
   color = null,
-  highlighted = false
+  highlighted = false,
+  opacity = 1.0  // Nouveau prop pour l'opacité
 }) => {
   const [scaleAnim] = useState(new Animated.Value(1));
   const [isPressed, setIsPressed] = useState(false);
@@ -89,7 +90,7 @@ const GameButton = ({
     return {
       backgroundColor,
       borderColor,
-      opacity: disabled ? 0.5 : 1,
+      opacity: disabled ? 0.5 : opacity,  // Utiliser le prop opacity
       borderWidth: highlighted ? 5 : 3
     };
   };
