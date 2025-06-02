@@ -12,15 +12,33 @@ export const GAME_STATES = {
 
 // Attack Types & Defense Actions
 export const ATTACK_TYPES = {
-  NORMAL: 'normal',    // Requires dodge (right button)
-  HEAVY: 'heavy',      // Requires parry (left button) 
-  FEINT: 'feint'       // No action required
+  NORMAL: 'normal',    // -20 PV
+  HEAVY: 'heavy',      // -50 PV
+  FEINT: 'feint'       // Piège - ne rien faire
 };
 
 export const DEFENSE_ACTIONS = {
   NONE: 'none',
-  DODGE: 'dodge',      // Right button
-  PARRY: 'parry'       // Left button
+  DODGE: 'dodge',      // Esquive (faible risque)
+  PARRY: 'parry'       // Parade (haut risque, contre-attaque si réussie)
+};
+
+// ============================================================================
+// COMBAT CONFIGURATION
+// ============================================================================
+
+// Damage System
+export const DAMAGE_CONFIG = {
+  NORMAL_ATTACK: 20,    // Dégâts attaque normale
+  HEAVY_ATTACK: 50,     // Dégâts attaque lourde
+  FEINT_PENALTY: 10,    // Pénalité si action sur feinte
+  COUNTER_DAMAGE: 25    // Dégâts de contre-attaque (parade réussie)
+};
+
+// Success Rates (probabilités de réussite)
+export const SUCCESS_RATES = {
+  DODGE: 0.85,          // 85% de chance de réussir l'esquive
+  PARRY: 0.65           // 65% de chance de réussir la parade
 };
 
 // ============================================================================
@@ -51,9 +69,11 @@ export const COLORS = {
   ENEMY_VARIANTS: [0xD3D3D3, 0xD3D3D3, 0xD3D3D3, 0xD3D3D3],
   
   // Attack Highlight Colors
-  ATTACK: { normal: '#ffff00',  // Yellow for dodge
-            heavy: '#ffff00',   // Blue for parry
-            feint: '#ffff00' }   // Red for feint
+  ATTACK: { 
+    normal: '#ffff00',  // Jaune pour attaque normale
+    heavy: '#ff0000',   // Rouge pour attaque lourde
+    feint: '#ff00ff'    // Violet pour feinte
+  }
 };
 
 // Button Configuration
@@ -132,6 +152,7 @@ export const ENEMY_CONFIG = {
   SIZE: 1.5,
   COLORS: [0xD3D3D3, 0xD3D3D3, 0xD3D3D3, 0xD3D3D3],
   GEOMETRIES: ['sphere', 'sphere', 'sphere'], // can be sphere, box, cone
+  HEALTH: 100, // Santé des ennemis
   ANIMATION: {
     ROTATION_SPEED: 0.5,
     HOVER_SPEED: 2.0,
@@ -156,41 +177,32 @@ export const TIMING_CONFIG = {
   TARGET_FPS: 60,
   
   // Action Windows (in milliseconds)
-  PERFECT_WINDOW: 1000,      // Perfect timing window
-  GOOD_WINDOW: 2500,         // Good timing window
-  TOTAL_ACTION_WINDOW: 4000, // Total time player has to react
+  ACTION_WINDOW: 2000,      // Temps pour réagir à une attaque
   
   // Attack Timing
-  ATTACK_TELEGRAPH: 2000,   // Warning time before attack
-  COMBO_TIMEOUT: 800,       // Time between attacks in combo
+  ATTACK_TELEGRAPH: 1500,   // Temps d'annonce avant l'attaque
+  ATTACK_COOLDOWN: 1500,    // Temps entre les attaques
   
   // Round Timing
   ROUND_START_DELAY: 1000,
   ROUND_END_DELAY: 2000,
   ACTION_RESULT_DISPLAY: 1500,
-  
-  // Speed Scaling
-  MIN_SPEED_MULTIPLIER: 0.80,
-  SPEED_LOG_FACTOR: 0.08
 };
 
 // Score System
 export const SCORE_CONFIG = {
-  PERFECT_HIT: 1000,
-  GOOD_HIT: 5000,
-  MISS_PENALTY: 0,
-  WRONG_ACTION_PENALTY: 0,
-  ROUND_COMPLETION_BONUS: 50,
-  COMBO_MULTIPLIER: 1.1  // 10% bonus per combo hit
+  DODGE_SUCCESS: 100,       // Points pour esquive réussie
+  PARRY_SUCCESS: 200,       // Points pour parade réussie (plus risqué)
+  COUNTER_BONUS: 150,       // Bonus pour contre-attaque
+  MISS_PENALTY: -50,        // Pénalité pour échec
+  FEINT_SUCCESS: 100,       // Points pour ne pas tomber dans le piège
+  COMBO_MULTIPLIER: 1.1     // 10% bonus par combo
 };
 
 // Health System
 export const HEALTH_CONFIG = {
   MAX_HEALTH: 100,
-  DAMAGE_ON_MISS: 10,
-  DAMAGE_ON_WRONG_ACTION: 5,
-  HEALING_PER_PERFECT: 0, // Can be used for difficulty balancing
-  CRITICAL_HEALTH_THRESHOLD: 20 // For UI warnings
+  CRITICAL_HEALTH_THRESHOLD: 20 // Pour avertissements UI
 };
 
 // ============================================================================
@@ -240,8 +252,9 @@ export const AUDIO_CONFIG = {
   
   SOUNDS: {
     ATTACK_WARNING: 'attack_warning.wav',
-    PERFECT_HIT: 'perfect_hit.wav',
-    GOOD_HIT: 'good_hit.wav',
+    DODGE_SUCCESS: 'dodge_success.wav',
+    PARRY_SUCCESS: 'parry_success.wav',
+    COUNTER_ATTACK: 'counter_attack.wav',
     MISS: 'miss.wav',
     GAME_OVER: 'game_over.wav'
   }
