@@ -6,8 +6,8 @@ import { GAME_STATES } from '../utils/Constants';
 import { StateManager } from '../managers/StateManager';
 import { SceneManager } from '../managers/SceneManager';
 import { EnemyManager } from '../managers/EnemyManager';
+import { PlayerManager } from '../managers/PlayerManager';
 import { GameManager } from '../managers/GameManager';
-import { DEFENSE_ACTIONS } from '../systems/EnemySystem';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -28,6 +28,7 @@ const GameScreen = () => {
   const stateManagerRef = useRef(null);
   const sceneManagerRef = useRef(null);
   const enemyManagerRef = useRef(null);
+  const playerManagerRef = useRef(null);
   const gameManagerRef = useRef(null);
   
   // Animation pour les messages
@@ -44,12 +45,14 @@ const GameScreen = () => {
       const stateManager = new StateManager();
       const sceneManager = new SceneManager(gl, screenWidth, screenHeight);
       const enemyManager = new EnemyManager(sceneManager);
-      const gameManager = new GameManager(stateManager, sceneManager, enemyManager);
+      const playerManager = new PlayerManager(sceneManager);
+      const gameManager = new GameManager(stateManager, sceneManager, enemyManager, playerManager);
       
       // Stocker les références
       stateManagerRef.current = stateManager;
       sceneManagerRef.current = sceneManager;
       enemyManagerRef.current = enemyManager;
+      playerManagerRef.current = playerManager;
       gameManagerRef.current = gameManager;
       
       // Écouter les changements d'état
@@ -94,7 +97,7 @@ const GameScreen = () => {
    */
   const handleDodge = () => {
     if (gameManagerRef.current) {
-      gameManagerRef.current.handlePlayerAction(DEFENSE_ACTIONS.DODGE);
+      gameManagerRef.current.handlePlayerAction('dodge');
     }
   };
 
@@ -103,7 +106,7 @@ const GameScreen = () => {
    */
   const handleParry = () => {
     if (gameManagerRef.current) {
-      gameManagerRef.current.handlePlayerAction(DEFENSE_ACTIONS.PARRY);
+      gameManagerRef.current.handlePlayerAction('parry');
     }
   };
 
