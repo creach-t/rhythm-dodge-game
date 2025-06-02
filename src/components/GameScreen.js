@@ -3,7 +3,14 @@ import { View, StyleSheet, Dimensions, Animated } from 'react-native';
 import { GLView } from 'expo-gl';
 import * as THREE from 'three';
 import GameUI from './GameUI';
-import { GAME_STATES, DEFENSE_ACTIONS, PLAYER_CONFIG, ENEMY_CONFIG } from '../utils/Constants';
+import { 
+  GAME_STATES, 
+  DEFENSE_ACTIONS, 
+  PLAYER_CONFIG, 
+  ENEMY_CONFIG,
+  TIMING_CONFIG,
+  ATTACK_TYPES
+} from '../utils/Constants';
 import { GameRenderer } from '../engine/GameRenderer';
 import { 
   setupScene, 
@@ -29,8 +36,9 @@ const GameScreen = () => {
     score: 0,
     health: PLAYER_CONFIG.HEALTH,
     combo: 0,
-    expectedAction: null,
-    resultMessage: ''
+    currentAttackType: null,
+    resultMessage: '',
+    enemyHealths: [100, 100, 100]
   });
 
   const sceneRef = useRef(null);
@@ -39,12 +47,12 @@ const GameScreen = () => {
   const animationFrameRef = useRef(null);
   const enemiesRef = useRef([]);
   const gameLogic = useRef(new GameLogic());
+  const actionTimeoutRef = useRef(null);
 
   // Initialisation de la scène 3D
   const initializeScene = async (gl) => {
     try {
       console.log('Initializing 3D scene...');
-      console.log('GL context:', gl);
       
       const gameRenderer = new GameRenderer(gl, screenWidth, screenHeight);
       rendererRef.current = gameRenderer;
@@ -58,7 +66,6 @@ const GameScreen = () => {
       setupLighting(scene);
 
       scene.add(createGround());
-      //scene.add(createGrid());
       scene.add(createPlayer());
 
       const enemies = [];
@@ -70,7 +77,6 @@ const GameScreen = () => {
       enemiesRef.current = enemies;
 
       console.log('Scene initialized with', scene.children.length, 'objects');
-      console.log('Camera FOV:', camera.fov, 'Aspect:', camera.aspect);
 
       // Démarrer la boucle de rendu
       startRenderLoop();
@@ -80,13 +86,10 @@ const GameScreen = () => {
       
     } catch (error) {
       console.error('Error initializing scene:', error);
-      console.error(error.stack);
     }
   };
 
   const startRenderLoop = () => {
-    // let frameCount = 0;
-    
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
       
@@ -102,12 +105,6 @@ const GameScreen = () => {
         if (rendererRef.current && sceneRef.current && cameraRef.current) {
           rendererRef.current.render(sceneRef.current, cameraRef.current);
         }
-        
-        // Log toutes les 60 frames
-        // frameCount++;
-        // if (frameCount % 60 === 0) {
-        //   console.log('Rendering frame', frameCount);
-        // }
       } catch (error) {
         console.error('Error in render loop:', error);
       }
@@ -115,24 +112,23 @@ const GameScreen = () => {
     animate();
   };
 
-const fadeAnim = useRef(new Animated.Value(0)).current; // initial opacity = 0
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-const showResultMessage = (message) => {
-  setGameState(prev => ({ ...prev, resultMessage: message }));
+  const showResultMessage = (message) => {
+    setGameState(prev => ({ ...prev, resultMessage: message }));
 
-  fadeAnim.setValue(1);
+    fadeAnim.setValue(1);
 
-  Animated.timing(fadeAnim, {
-    toValue: 0,
-    duration: 3000,
-    useNativeDriver: true,
-  }).start(() => {
-
-    setTimeout(() => {
-      setGameState(prev => ({ ...prev, resultMessage: '' }));
-    }, 0);
-  });
-};
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: TIMING_CONFIG.ACTION_RESULT_DISPLAY,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        setGameState(prev => ({ ...prev, resultMessage: '' }));
+      }, 0);
+    });
+  };
 
   const startGameplay = () => {
     console.log('Starting gameplay...');
@@ -155,18 +151,28 @@ const showResultMessage = (message) => {
       if (enemy && gameLogic.current.triggerAttack(enemyId, attackType)) {
         highlightEnemyAttack(enemy, attackType);
         
-        // Mettre à jour l'action attendue dans l'UI
+        // Mettre à jour l'état avec le type d'attaque actuel
         setGameState(prev => ({
           ...prev,
-          expectedActions: gameLogic.current.expectedActions
+          currentAttackType: attackType
         }));
         
-        // Timeout après 4 secondes
-        setTimeout(() => {
+        // Configurer le timeout pour l'action
+        if (actionTimeoutRef.current) {
+          clearTimeout(actionTimeoutRef.current);
+        }
+        
+        actionTimeoutRef.current = setTimeout(() => {
           if (gameLogic.current.awaitingAction) {
-            handleMissedAction();
+            // Si c'était une feinte et que le joueur n'a rien fait, c'est bien !
+            if (attackType === ATTACK_TYPES.FEINT) {
+              handlePlayerAction(DEFENSE_ACTIONS.NONE);
+            } else {
+              // Sinon, le joueur a raté l'action
+              handleMissedAction();
+            }
           }
-        }, 4000);
+        }, TIMING_CONFIG.ACTION_WINDOW);
       }
     } catch (error) {
       console.error('Error triggering attack:', error);
@@ -177,21 +183,24 @@ const showResultMessage = (message) => {
     console.log('Player missed the action!');
     resetAllEnemies();
     
-    // Perdre de la santé et mettre à jour le score
+    const damage = gameLogic.current.getDamageForAttack();
+    
+    // Perdre de la santé
     setGameState(prev => ({
       ...prev,
-      health: Math.max(0, prev.health - 10),
+      health: Math.max(0, prev.health - damage),
       combo: 0,
-      expectedAction: null
+      currentAttackType: null
     }));
     
+    showResultMessage('Trop lent !');
     gameLogic.current.reset();
     
     // Vérifier si game over
-    if (gameState.health <= 0) {
+    if (gameState.health - damage <= 0) {
       handleGameOver();
     } else {
-      setTimeout(() => triggerRandomAttack(), 3000);
+      setTimeout(() => triggerRandomAttack(), TIMING_CONFIG.ATTACK_COOLDOWN);
     }
   };
 
@@ -199,46 +208,72 @@ const showResultMessage = (message) => {
     enemiesRef.current.forEach(enemy => resetEnemyAppearance(enemy));
   };
 
-  const updateGameState = (points) => {
+  const handleDodge = () => {
+    if (gameState.currentAttackType === ATTACK_TYPES.FEINT) {
+      // Le joueur a appuyé sur un bouton pendant une feinte
+      handlePlayerAction(DEFENSE_ACTIONS.DODGE);
+    } else {
+      handlePlayerAction(DEFENSE_ACTIONS.DODGE);
+    }
+  };
+
+  const handleParry = () => {
+    if (gameState.currentAttackType === ATTACK_TYPES.FEINT) {
+      // Le joueur a appuyé sur un bouton pendant une feinte
+      handlePlayerAction(DEFENSE_ACTIONS.PARRY);
+    } else {
+      handlePlayerAction(DEFENSE_ACTIONS.PARRY);
+    }
+  };
+
+  const handlePlayerAction = (action) => {
+    if (!gameLogic.current.awaitingAction) return;
+    
+    // Annuler le timeout
+    if (actionTimeoutRef.current) {
+      clearTimeout(actionTimeoutRef.current);
+    }
+    
+    const result = gameLogic.current.checkPlayerAction(action);
+    if (!result) return;
+    
+    console.log(`Action result: ${result.message} (${result.points} points, ${result.damage} damage)`);
+    
+    resetAllEnemies();
+    
+    // Mettre à jour l'état du jeu
     setGameState(prev => {
-      const newHealth = prev.health
-      const newScore = Math.max(0, prev.score + points);
-      const newCombo = points > 0 ? prev.combo + 1 : 0;
+      const newHealth = Math.max(0, prev.health - result.damage);
+      const newScore = Math.max(0, prev.score + result.points);
+      const newCombo = result.success ? prev.combo + 1 : 0;
+      
+      // Mettre à jour la santé des ennemis
+      const newEnemyHealths = [...prev.enemyHealths];
+      for (let i = 0; i < newEnemyHealths.length; i++) {
+        newEnemyHealths[i] = gameLogic.current.getEnemyHealth(i);
+      }
       
       return {
         ...prev,
         score: newScore,
         health: newHealth,
         combo: newCombo,
-        expectedAction: null
+        currentAttackType: null,
+        enemyHealths: newEnemyHealths
       };
     });
-  };
-
-  const handleDodge = () => {
-    handlePlayerAction(DEFENSE_ACTIONS.DODGE);
-  };
-
-  const handleParry = () => {
-    handlePlayerAction(DEFENSE_ACTIONS.PARRY);
-  };
-
-  const handlePlayerAction = (action) => {
-    const result = gameLogic.current.checkPlayerAction(action);
-    if (!result) return;
-    
-    console.log(`Action result: ${result.message} (${result.points} points)`);
-    
-    resetAllEnemies();
-    updateGameState(result.points);
 
     showResultMessage(result.message);
     
     // Vérifier si game over
-    if (gameState.health <= 0) {
+    if (gameState.health - result.damage <= 0) {
       handleGameOver();
+    } else if (gameLogic.current.areAllEnemiesDefeated()) {
+      // Tous les ennemis sont vaincus
+      showResultMessage('Victoire ! Tous les ennemis sont vaincus !');
+      setTimeout(() => handleGameOver(), 2000);
     } else {
-      setTimeout(() => triggerRandomAttack(), 1500);
+      setTimeout(() => triggerRandomAttack(), TIMING_CONFIG.ATTACK_COOLDOWN);
     }
   };
 
@@ -247,7 +282,7 @@ const showResultMessage = (message) => {
     setGameState(prev => ({
       ...prev,
       state: GAME_STATES.GAME_OVER,
-      expectedAction: null
+      currentAttackType: null
     }));
     
     // Arrêter les animations
@@ -261,6 +296,9 @@ const showResultMessage = (message) => {
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (actionTimeoutRef.current) {
+        clearTimeout(actionTimeoutRef.current);
       }
       if (rendererRef.current) {
         rendererRef.current.dispose();
@@ -280,11 +318,12 @@ const showResultMessage = (message) => {
         health={gameState.health}
         combo={gameState.combo}
         gameState={gameState.state}
-        expectedAction={gameState.expectedAction}
+        currentAttackType={gameState.currentAttackType}
         resultMessage={gameState.resultMessage}
         fadeAnim={fadeAnim}
         onDodge={handleDodge}
         onParry={handleParry}
+        enemyHealths={gameState.enemyHealths}
       />
     </View>
   );
