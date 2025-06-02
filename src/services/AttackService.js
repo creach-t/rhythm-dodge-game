@@ -2,7 +2,7 @@ import { ATTACK_TYPES, ENEMY_CONFIG, TIMING_CONFIG } from '../utils/Constants';
 import { highlightEnemyAttack, resetEnemyAppearance } from '../systems/EnemySystem';
 
 /**
- * Service de gestion des attaques
+ * Service de gestion des attaques - FEINTES CORRIGÉES
  * Responsabilité unique : Logique des attaques ennemies et timing
  */
 class AttackService {
@@ -11,6 +11,7 @@ class AttackService {
     this.currentAttack = null;
     this.attackStartTime = 0;
     this.timeoutId = null;
+    this.isFeintActive = false; // Nouveau flag pour les feintes
   }
 
   /**
@@ -29,20 +30,19 @@ class AttackService {
   }
 
   /**
-   * Déclencher une attaque
+   * Déclencher une attaque - LOGIQUE FEINTE CORRIGÉE
    * @param {number} enemyId - ID de l'ennemi qui attaque
    * @param {string} attackType - Type d'attaque
    * @param {Object} enemy - Objet 3D de l'ennemi
    * @param {Function} onTimeout - Callback en cas de timeout
    */
   triggerAttack(enemyId, attackType, enemy, onTimeout) {
-    if (this.isAwaitingAction) {
+    if (this.isAwaitingAction || this.isFeintActive) {
       console.warn('Attack already in progress');
       return false;
     }
 
     try {
-      this.isAwaitingAction = true;
       this.currentAttack = {
         enemyId,
         type: attackType,
@@ -50,21 +50,46 @@ class AttackService {
       };
       this.attackStartTime = performance.now();
 
-      // Effet visuel sur l'ennemi
-      if (enemy) {
-        highlightEnemyAttack(enemy, attackType);
-      }
-
-      // Timeout automatique
-      this.timeoutId = setTimeout(() => {
-        if (this.isAwaitingAction) {
-          console.log('Attack timed out');
-          this.resetAttack();
-          if (onTimeout) {
-            onTimeout();
-          }
+      // CORRECTION FEINTE: Pour les feintes, pas d'attente d'action
+      if (attackType === ATTACK_TYPES.FEINT) {
+        this.isFeintActive = true;
+        this.isAwaitingAction = false;
+        console.log(`🎭 Feint started - player should not react`);
+        
+        // Effet visuel sur l'ennemi
+        if (enemy) {
+          highlightEnemyAttack(enemy, attackType);
         }
-      }, TIMING_CONFIG.TOTAL_ACTION_WINDOW);
+
+        // Auto-succès après le temps d'exécution (si pas d'action du joueur)
+        this.timeoutId = setTimeout(() => {
+          if (this.isFeintActive && !this.isAwaitingAction) {
+            console.log('✅ Feint successful - player did nothing');
+            this.handleFeintSuccess(onTimeout);
+          }
+        }, TIMING_CONFIG.TOTAL_ACTION_WINDOW);
+
+      } else {
+        // Attaques normales et lourdes : attendre une action
+        this.isAwaitingAction = true;
+        this.isFeintActive = false;
+        
+        // Effet visuel sur l'ennemi
+        if (enemy) {
+          highlightEnemyAttack(enemy, attackType);
+        }
+
+        // Timeout pour les attaques normales
+        this.timeoutId = setTimeout(() => {
+          if (this.isAwaitingAction) {
+            console.log('Attack timed out');
+            this.resetAttack();
+            if (onTimeout) {
+              onTimeout();
+            }
+          }
+        }, TIMING_CONFIG.TOTAL_ACTION_WINDOW);
+      }
 
       console.log(`Attack triggered: Enemy ${enemyId}, Type: ${attackType}`);
       return true;
@@ -73,6 +98,22 @@ class AttackService {
       console.error('Error triggering attack:', error);
       this.resetAttack();
       return false;
+    }
+  }
+
+  /**
+   * Gérer le succès d'une feinte (appelé automatiquement)
+   */
+  handleFeintSuccess(onComplete) {
+    console.log('🎭 Feint completed successfully');
+    this.resetAttack();
+    
+    // Simuler un résultat positif pour le succès de feinte
+    if (onComplete) {
+      // Créer un "faux" timeout qui indique le succès
+      setTimeout(() => {
+        onComplete('feint_success');
+      }, 10);
     }
   }
 
@@ -87,17 +128,30 @@ class AttackService {
       case ATTACK_TYPES.HEAVY:
         return 'parry';
       case ATTACK_TYPES.FEINT:
-        return 'none';
+        return 'none'; // Indique qu'aucune action n'est attendue
       default:
         return 'none';
     }
   }
 
   /**
-   * Évaluer le timing d'une action du joueur
+   * Évaluer le timing d'une action du joueur - CORRECTION FEINTE
    * @param {number} actionTime - Temps de l'action du joueur
    */
   evaluateTiming(actionTime = performance.now()) {
+    // CORRECTION FEINTE: Si c'est une feinte et que le joueur agit = ÉCHEC
+    if (this.isFeintActive && this.currentAttack?.type === ATTACK_TYPES.FEINT) {
+      console.log(`❌ Player reacted to FEINT - should have done nothing!`);
+      
+      // Arrêter la feinte et marquer comme échec
+      this.isFeintActive = false;
+      return {
+        quality: 'feint_fail',
+        timeDiff: actionTime - this.attackStartTime,
+        message: 'Ne bougez pas sur les feintes!'
+      };
+    }
+
     if (!this.isAwaitingAction || !this.currentAttack) {
       return null;
     }
@@ -126,10 +180,25 @@ class AttackService {
   }
 
   /**
+   * Vérifier si c'est une feinte et créer le résultat de succès
+   */
+  evaluateFeintSuccess() {
+    if (this.isFeintActive && this.currentAttack?.type === ATTACK_TYPES.FEINT) {
+      return {
+        quality: 'feint_success',
+        timeDiff: 0,
+        message: 'Feinte évitée!'
+      };
+    }
+    return null;
+  }
+
+  /**
    * Réinitialiser l'état d'attaque
    */
   resetAttack() {
     this.isAwaitingAction = false;
+    this.isFeintActive = false;
     this.currentAttack = null;
     this.attackStartTime = 0;
 
@@ -159,7 +228,7 @@ class AttackService {
    * @param {Function} onTimeout - Callback en cas de timeout
    */
   triggerRandomAttack(enemies, onTimeout) {
-    if (this.isAwaitingAction) {
+    if (this.isAwaitingAction || this.isFeintActive) {
       return null;
     }
 
@@ -192,6 +261,20 @@ class AttackService {
   get attackDuration() {
     if (!this.currentAttack) return 0;
     return performance.now() - this.attackStartTime;
+  }
+
+  get isCurrentlyFeint() {
+    return this.isFeintActive;
+  }
+
+  // Méthodes utilitaires pour le debug
+  getDebugInfo() {
+    return {
+      isAwaitingAction: this.isAwaitingAction,
+      isFeintActive: this.isFeintActive,
+      currentAttack: this.currentAttack,
+      attackDuration: this.attackDuration
+    };
   }
 }
 
