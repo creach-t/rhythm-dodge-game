@@ -296,7 +296,7 @@ const GameScreen = () => {
 
     // Animation de fade
     fadeAnim.setValue(1);
-    Animated.timing(fadeAnim, TemplateString`
+    Animated.timing(fadeAnim, {
       toValue: 0,
       duration: TIMING_CONFIG.ACTION_RESULT_DISPLAY,
       useNativeDriver: true,
