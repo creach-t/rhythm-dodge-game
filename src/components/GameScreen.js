@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
 import { GLView } from 'expo-gl';
 
 // Hooks modulaires
@@ -11,14 +11,14 @@ import { useGameLoop } from '../hooks/useGameLoop';
 import { attackPhaseService } from '../services/AttackPhaseService';
 import { playerActionService } from '../services/PlayerActionService';
 
-// Composants NOUVEAUX
-import TurnBasedUI from './TurnBasedUI';
+// Composants - RETOUR À GameUI
+import GameUI from './GameUI';
 
 // Constants
 import { TIMING_CONFIG, COLORS, ATTACK_TYPES } from '../utils/Constants';
 
 /**
- * Composant GameScreen refactorisé - UTILISE LES NOUVEAUX SERVICES
+ * Composant GameScreen refactorisé - UTILISE GameUI avec logique feintes
  * Responsabilité unique : Orchestration des modules et rendu de l'interface
  */
 const GameScreen = () => {
@@ -54,7 +54,6 @@ const GameScreen = () => {
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [currentAttack, setCurrentAttack] = React.useState(null);
-  const [expectedDefense, setExpectedDefense] = React.useState(null);
   
   // Fonction de rendu appelée à chaque frame
   const handleRenderFrame = useCallback((time, deltaTime) => {
@@ -74,7 +73,7 @@ const GameScreen = () => {
   });
 
   // ====================================================================
-  // LOGIQUE DE JEU - NOUVEAU SYSTÈME
+  // LOGIQUE DE JEU - NOUVEAU SYSTÈME AVEC FEINTES
   // ====================================================================
 
   // Démarrer le gameplay après initialisation
@@ -98,7 +97,7 @@ const GameScreen = () => {
     return Math.floor(Math.random() * enemies.length);
   }, [getAllEnemies]);
 
-  // Obtenir l'action de défense attendue
+  // Obtenir l'action de défense attendue pour GameUI
   const getExpectedDefenseAction = useCallback((attackType) => {
     switch (attackType) {
       case ATTACK_TYPES.NORMAL:
@@ -106,9 +105,9 @@ const GameScreen = () => {
       case ATTACK_TYPES.HEAVY:
         return 'parry';
       case ATTACK_TYPES.FEINT:
-        return 'none'; // Ne rien faire pour les feintes
+        return 'none'; // Indique à GameUI d'afficher "ATTENDRE!"
       default:
-        return 'none';
+        return null;
     }
   }, []);
 
@@ -144,7 +143,10 @@ const GameScreen = () => {
       };
       
       setCurrentAttack(attackInfo);
-      setExpectedDefense(getExpectedDefenseAction(attackType));
+      
+      // Définir l'action attendue pour GameUI
+      const expectedAction = getExpectedDefenseAction(attackType);
+      setExpectedAction(expectedAction);
 
       // Démarrer l'attaque avec le nouveau service
       const success = attackPhaseService.startAttack(enemy, attackType, {
@@ -153,7 +155,7 @@ const GameScreen = () => {
         },
         onExecutionPhase: (type, enemy) => {
           console.log(`⚡ Execution phase: ${type}`);
-          // Pour les feintes, programmé la fin automatique
+          // Pour les feintes, programmer la fin automatique
           if (type === ATTACK_TYPES.FEINT) {
             setTimeout(() => {
               handleFeintComplete();
@@ -175,22 +177,27 @@ const GameScreen = () => {
       console.error('Error triggering attack:', error);
       handleAttackComplete();
     }
-  }, [isPlaying, getAllEnemies, getRandomEnemyId, getRandomAttackType, getExpectedDefenseAction, clearResultMessage]);
+  }, [isPlaying, getAllEnemies, getRandomEnemyId, getRandomAttackType, getExpectedDefenseAction, clearResultMessage, setExpectedAction]);
 
   // Gérer la fin automatique d'une feinte
   const handleFeintComplete = useCallback(() => {
     if (currentAttack?.type === ATTACK_TYPES.FEINT) {
+      console.log('🎭 Handling feint completion');
+      
       // Vérifier si le joueur a bougé pendant la feinte
       const feintResult = attackPhaseService.evaluateFeintSuccess();
       
       if (feintResult) {
-        // Succès de feinte
+        // Succès de feinte - le joueur n'a pas bougé
         processActionResult({
           success: true,
           message: feintResult.message,
           scoreChange: 10, // Bonus pour avoir évité la feinte
           healthChange: 0
         });
+      } else {
+        // Le joueur a probablement bougé - déjà traité dans handlePlayerAction
+        console.log('Feint already handled by player action');
       }
     }
   }, [currentAttack]);
@@ -198,7 +205,7 @@ const GameScreen = () => {
   // Gérer la fin d'une attaque
   const handleAttackComplete = useCallback(() => {
     setCurrentAttack(null);
-    setExpectedDefense(null);
+    setExpectedAction(null);
     
     // Programmer la prochaine attaque
     setTimeout(() => {
@@ -206,7 +213,7 @@ const GameScreen = () => {
         triggerNextAttack();
       }
     }, TIMING_CONFIG.ACTION_RESULT_DISPLAY);
-  }, [isPlaying, isDead, triggerNextAttack]);
+  }, [isPlaying, isDead, triggerNextAttack, setExpectedAction]);
 
   // Traiter le résultat d'une action
   const processActionResult = useCallback((result) => {
@@ -214,11 +221,11 @@ const GameScreen = () => {
       console.log('📊 Processing action result:', result);
 
       // Appliquer les changements de score et santé
-      if (result.scoreChange !== 0) {
+      if (result.scoreChange && result.scoreChange !== 0) {
         updateScore(result.scoreChange);
       }
       
-      if (result.healthChange !== 0) {
+      if (result.healthChange && result.healthChange !== 0) {
         if (result.healthChange > 0) {
           heal(result.healthChange);
         } else {
@@ -241,7 +248,7 @@ const GameScreen = () => {
   }, [updateScore, heal, takeDamage, isDead, gameOver]);
 
   // ====================================================================
-  // GESTION DES ACTIONS DU JOUEUR - NOUVEAU SYSTÈME
+  // GESTION DES ACTIONS DU JOUEUR - LOGIQUE FEINTES INTÉGRÉE
   // ====================================================================
 
   const handlePlayerAction = useCallback((action) => {
@@ -252,6 +259,20 @@ const GameScreen = () => {
 
     try {
       console.log(`🎮 Player action: ${action} during ${currentAttack.type}`);
+
+      // LOGIQUE FEINTE : Si c'est une feinte et que le joueur bouge = ÉCHEC
+      if (currentAttack.type === ATTACK_TYPES.FEINT) {
+        console.log('❌ Player moved during feint!');
+        
+        processActionResult({
+          success: false,
+          message: 'Ne bougez pas sur les feintes!',
+          scoreChange: 0,
+          healthChange: -10 // Petits dégâts pour avoir bougé sur une feinte
+        });
+        
+        return;
+      }
 
       // Évaluer le timing avec le nouveau service
       const timingResult = attackPhaseService.evaluatePlayerTiming();
@@ -333,7 +354,7 @@ const GameScreen = () => {
   }, [dispose]);
 
   // ====================================================================
-  // RENDU - NOUVEAU UI
+  // RENDU - GameUI AVEC LOGIQUE FEINTES
   // ====================================================================
 
   return (
@@ -343,67 +364,18 @@ const GameScreen = () => {
         onContextCreate={handleContextCreate}
       />
       
-      {/* NOUVEAU UI SYSTÈME */}
-      <TurnBasedUI
-        turnState={{
-          currentTurn: isPlaying ? 'ENEMY_TURN' : 'PREPARATION',
-          turnNumber: 1,
-          roundNumber: 1,
-        }}
-        gameState={{
-          score: gameState.score,
-          health: gameState.health,
-          combo: gameState.combo,
-          state: gameState.state
-        }}
-        availableTargets={[]} // Pas utilisé dans ce mode
-        remainingTime={0} // Pas utilisé dans ce mode
-        turnProgress={0} // Pas utilisé dans ce mode
-        onSelectHeal={() => {}} // Pas utilisé dans ce mode
-        onSelectAttack={() => {}} // Pas utilisé dans ce mode
-        onSelectDefend={() => {}} // Pas utilisé dans ce mode
-        onConfirmAction={() => {}} // Pas utilisé dans ce mode
+      {/* INTERFACE RESTAURÉE AVEC GameUI */}
+      <GameUI
+        score={gameState.score}
+        health={gameState.health}
+        combo={gameState.combo}
+        gameState={gameState.state}
+        expectedAction={gameState.expectedAction}
+        resultMessage={gameState.resultMessage}
+        fadeAnim={fadeAnim}
         onDodge={handleDodge}
         onParry={handleParry}
-        onWaitForFeint={() => {}} // Les feintes sont automatiques maintenant
-        canSelectAction={() => false} // Mode défense uniquement
-        canConfirmAction={false}
-        hasSelectedAction={false}
-        currentAttack={currentAttack}
-        expectedDefense={expectedDefense}
       />
-
-      {/* Message de résultat avec fade */}
-      {gameState.resultMessage && (
-        <Animated.View 
-          style={[
-            styles.resultMessage, 
-            { opacity: fadeAnim }
-          ]}
-        >
-          <Text style={styles.resultText}>
-            {gameState.resultMessage}
-          </Text>
-        </Animated.View>
-      )}
-
-      {/* Informations de debug */}
-      {__DEV__ && (
-        <View style={styles.debugInfo}>
-          <Text style={styles.debugText}>
-            Attack: {currentAttack ? `${currentAttack.type} (${currentAttack.enemyId})` : 'None'}
-          </Text>
-          <Text style={styles.debugText}>
-            Expected: {expectedDefense || 'None'}
-          </Text>
-          <Text style={styles.debugText}>
-            Can React: {attackPhaseService.canPlayerReact() ? 'Yes' : 'No'}
-          </Text>
-          <Text style={styles.debugText}>
-            Phase: {attackPhaseService.getDebugInfo().currentPhase || 'None'}
-          </Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -419,37 +391,6 @@ const styles = StyleSheet.create({
   },
   glView: {
     flex: 1,
-  },
-  resultMessage: {
-    position: 'absolute',
-    top: '40%',
-    left: 20,
-    right: 20,
-    alignItems: 'center',
-    backgroundColor: COLORS.UI_BACKGROUND,
-    padding: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: COLORS.PRIMARY,
-  },
-  resultText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.TEXT,
-    textAlign: 'center',
-  },
-  debugInfo: {
-    position: 'absolute',
-    top: 50,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 10,
-    borderRadius: 5,
-  },
-  debugText: {
-    color: COLORS.TEXT,
-    fontSize: 12,
-    fontFamily: 'monospace',
   },
 });
 
