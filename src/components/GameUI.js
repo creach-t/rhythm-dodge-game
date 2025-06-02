@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Animated } from 'react-native';
-import { COLORS, BUTTON_CONFIG } from '../utils/Constants';
+import { COLORS, BUTTON_CONFIG, ATTACK_TYPES } from '../utils/Constants';
 import GameButton from './GameButton';
 
 const GameUI = ({ 
@@ -8,24 +8,39 @@ const GameUI = ({
   health = 100, 
   combo = 0,
   gameState = 'playing',
-  expectedAction = null,
+  currentAttackType = null,
   onDodge,
   onParry,
   resultMessage,
   fadeAnim,
+  enemyHealths = [100, 100, 100]
 }) => {
-  // Déterminer les couleurs des boutons selon l'action attendue
-  const getButtonColor = (buttonType) => {
-    if (gameState !== 'playing' || !expectedAction) return COLORS.UI_BORDER;
+  // Déterminer les messages d'attaque
+  const getAttackMessage = () => {
+    if (!currentAttackType) return null;
     
-    if (buttonType === 'dodge' && expectedAction === 'dodge') {
-      return COLORS.WARNING; // Jaune pour esquive
-    } else if (buttonType === 'parry' && expectedAction === 'parry') {
-      return COLORS.SECONDARY; // Bleu pour parade
-    } else if (expectedAction === 'none') {
-      return COLORS.DANGER; // Rouge pour ne rien faire
+    switch (currentAttackType) {
+      case ATTACK_TYPES.NORMAL:
+        return '⚔️ ATTAQUE NORMALE! (-20 PV)';
+      case ATTACK_TYPES.HEAVY:
+        return '💥 ATTAQUE LOURDE! (-50 PV)';
+      case ATTACK_TYPES.FEINT:
+        return '🎭 FEINTE! Ne touchez rien!';
+      default:
+        return null;
+    }
+  };
+
+  // Déterminer les couleurs des boutons selon l'attaque
+  const getButtonColor = (buttonType) => {
+    if (gameState !== 'playing' || !currentAttackType) return COLORS.UI_BORDER;
+    
+    // Pendant une feinte, tous les boutons sont rouges (danger)
+    if (currentAttackType === ATTACK_TYPES.FEINT) {
+      return COLORS.DANGER;
     }
     
+    // Sinon, boutons normaux
     return COLORS.UI_BORDER;
   };
 
@@ -70,24 +85,46 @@ const GameUI = ({
               </View>
             )}
           </View>
-                {resultMessage ? (
-        <Animated.View style={[styles.resultMessageContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.resultMessageText}>{resultMessage}</Text>
-        </Animated.View>
-      ) : null}
+
+          {/* Santé des ennemis */}
+          <View style={styles.enemyHealthContainer}>
+            {enemyHealths.map((enemyHealth, index) => (
+              <View key={index} style={styles.enemyHealthItem}>
+                <Text style={styles.enemyLabel}>Ennemi {index + 1}</Text>
+                <View style={styles.enemyHealthBar}>
+                  <View 
+                    style={[
+                      styles.enemyHealthFill, 
+                      { 
+                        width: `${enemyHealth}%`,
+                        backgroundColor: enemyHealth > 0 ? COLORS.DANGER : COLORS.UI_BORDER
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {resultMessage ? (
+            <Animated.View style={[styles.resultMessageContainer, { opacity: fadeAnim }]}>
+              <Text style={styles.resultMessageText}>{resultMessage}</Text>
+            </Animated.View>
+          ) : null}
         </SafeAreaView>
       </View>
 
       {/* Interface inférieure - Contrôles */}
       <View style={styles.bottomUI}>
         <View style={styles.controlsContainer}>
-          {/* Indicateur d'action */}
-          {expectedAction && (
-            <View style={styles.actionIndicator}>
+          {/* Indicateur d'attaque */}
+          {currentAttackType && (
+            <View style={[
+              styles.actionIndicator,
+              { borderColor: currentAttackType === ATTACK_TYPES.FEINT ? COLORS.DANGER : COLORS.PRIMARY }
+            ]}>
               <Text style={styles.actionText}>
-                {expectedAction === 'dodge' ? '⚡ ESQUIVE!' : 
-                 expectedAction === 'parry' ? '🛡️ PARADE!' :
-                 expectedAction === 'none' ? '⏸️ ATTENDRE!' : ''}
+                {getAttackMessage()}
               </Text>
             </View>
           )}
@@ -96,6 +133,8 @@ const GameUI = ({
           <View style={styles.buttonsContainer}>
             <View style={styles.buttonWrapper}>
               <Text style={styles.buttonLabel}>PARADE</Text>
+              <Text style={styles.buttonDescription}>Haut risque</Text>
+              <Text style={styles.buttonDescription}>Contre-attaque</Text>
               <GameButton
                 title="🛡️"
                 type="parry"
@@ -103,7 +142,6 @@ const GameUI = ({
                 disabled={gameState !== 'playing'}
                 testID="parry-button"
                 color={getButtonColor('parry')}
-                highlighted={expectedAction === 'parry'}
               />
             </View>
 
@@ -119,6 +157,8 @@ const GameUI = ({
 
             <View style={styles.buttonWrapper}>
               <Text style={styles.buttonLabel}>ESQUIVE</Text>
+              <Text style={styles.buttonDescription}>Faible risque</Text>
+              <Text style={styles.buttonDescription}>Évite dégâts</Text>
               <GameButton
                 title="⚡"
                 type="dodge"
@@ -126,7 +166,6 @@ const GameUI = ({
                 disabled={gameState !== 'playing'}
                 testID="dodge-button"
                 color={getButtonColor('dodge')}
-                highlighted={expectedAction === 'dodge'}
               />
             </View>
           </View>
@@ -175,6 +214,34 @@ const styles = StyleSheet.create({
     color: COLORS.WARNING,
     fontSize: 20,
   },
+  enemyHealthContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 15,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.UI_BORDER,
+  },
+  enemyHealthItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  enemyLabel: {
+    fontSize: 10,
+    color: COLORS.TEXT_SECONDARY,
+    marginBottom: 4,
+  },
+  enemyHealthBar: {
+    width: 80,
+    height: 4,
+    backgroundColor: COLORS.UI_BORDER,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  enemyHealthFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
   container: {
     flex: 1,
   },
@@ -182,11 +249,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '500%',
     left: '50%',
-    transform: [{ translateX: -150 }, { translateY: -20 }], // centre approx. selon largeur/hauteur du texte
+    transform: [{ translateX: -150 }, { translateY: -20 }],
     width: 300,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -240,6 +307,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT,
     fontWeight: 'bold',
     letterSpacing: 1,
+    textAlign: 'center',
   },
   buttonsContainer: {
     flexDirection: 'row',
@@ -256,8 +324,13 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_SECONDARY,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: 4,
     fontWeight: '600',
+  },
+  buttonDescription: {
+    fontSize: 10,
+    color: COLORS.TEXT_SECONDARY,
+    marginBottom: 2,
   },
   centerSpace: {
     flex: 1,
