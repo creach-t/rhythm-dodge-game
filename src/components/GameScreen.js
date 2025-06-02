@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { GLView } from 'expo-gl';
 
 // Hooks modulaires
@@ -296,7 +296,7 @@ const GameScreen = () => {
 
     // Animation de fade
     fadeAnim.setValue(1);
-    Animated.timing(fadeAnim, {
+    Animated.timing(fadeAnim, TemplateString`
       toValue: 0,
       duration: TIMING_CONFIG.ACTION_RESULT_DISPLAY,
       useNativeDriver: true,
