@@ -1,17 +1,5 @@
 import * as THREE from 'three';
-import { GAME_CONFIG } from '../utils/Constants';
-
-export const DEFENSE_ACTIONS = {
-  NONE: 'none',
-  DODGE: 'dodge',
-  PARRY: 'parry'
-};
-
-export const ATTACK_COLORS = {
-  normal: 0xffd93d,  // Jaune pour esquive
-  heavy: 0x45b7d1,   // Bleu pour parade
-  feint: 0xff6b6b    // Rouge pour ne rien faire
-};
+import { COLORS, ENEMY_CONFIG } from '../utils/Constants';
 
 export const createEnemy = (index, totalEnemies, radius) => {
   let geometry;
@@ -31,8 +19,8 @@ export const createEnemy = (index, totalEnemies, radius) => {
   }
 
   const material = new THREE.MeshPhongMaterial({ 
-    color: GAME_CONFIG.ENEMIES.COLORS[index],
-    emissive: GAME_CONFIG.ENEMIES.COLORS[index],
+    color: ENEMY_CONFIG.COLORS[index],
+    emissive: ENEMY_CONFIG.COLORS[index],
     emissiveIntensity: 0.2,
     shininess: 100
   });
@@ -54,7 +42,7 @@ export const createEnemy = (index, totalEnemies, radius) => {
     id: index, 
     isAttacking: false, 
     attackType: null,
-    originalColor: GAME_CONFIG.ENEMIES.COLORS[index],
+    originalColor: ENEMY_CONFIG.COLORS[index],
     originalPosition: enemy.position.clone()
   };
 
@@ -89,7 +77,7 @@ export const animateEnemies = (enemies, time) => {
 };
 
 export const highlightEnemyAttack = (enemy, attackType) => {
-  const color = ATTACK_COLORS[attackType] || enemy.userData.originalColor;
+  const color = COLORS.ATTACK.attackType;
   enemy.material.color.setHex(color);
   enemy.material.emissive.setHex(color);
   enemy.material.emissiveIntensity = 0.5;

@@ -3,7 +3,7 @@ import { View, StyleSheet, Dimensions, Animated } from 'react-native';
 import { GLView } from 'expo-gl';
 import * as THREE from 'three';
 import GameUI from './GameUI';
-import { GAME_CONFIG, GAME_STATES } from '../utils/Constants';
+import { GAME_STATES, DEFENSE_ACTIONS, PLAYER_CONFIG, ENEMY_CONFIG } from '../utils/Constants';
 import { GameRenderer } from '../engine/GameRenderer';
 import { 
   setupScene, 
@@ -18,7 +18,6 @@ import {
   animateEnemies, 
   highlightEnemyAttack, 
   resetEnemyAppearance,
-  DEFENSE_ACTIONS 
 } from '../systems/EnemySystem';
 import { GameLogic } from '../systems/GameLogic';
 
@@ -28,7 +27,7 @@ const GameScreen = () => {
   const [gameState, setGameState] = useState({
     state: GAME_STATES.PLAYING,
     score: 0,
-    health: GAME_CONFIG.PLAYER.HEALTH,
+    health: PLAYER_CONFIG.HEALTH,
     combo: 0,
     expectedAction: null,
     resultMessage: ''
@@ -47,29 +46,24 @@ const GameScreen = () => {
       console.log('Initializing 3D scene...');
       console.log('GL context:', gl);
       
-      // Créer le renderer avec le module GameRenderer
       const gameRenderer = new GameRenderer(gl, screenWidth, screenHeight);
       rendererRef.current = gameRenderer;
 
-      // Créer la scène et la caméra
       const scene = setupScene();
       const camera = setupCamera(screenWidth, screenHeight);
-      
+
       sceneRef.current = scene;
       cameraRef.current = camera;
 
-      // Ajouter l'éclairage
       setupLighting(scene);
 
-      // Créer les objets de la scène
       scene.add(createGround());
-      scene.add(createGrid());
+      //scene.add(createGrid());
       scene.add(createPlayer());
 
-      // Créer les ennemis
       const enemies = [];
-      for (let i = 0; i < GAME_CONFIG.ENEMIES.MAX_COUNT; i++) {
-        const enemy = createEnemy(i, GAME_CONFIG.ENEMIES.MAX_COUNT, GAME_CONFIG.ENEMIES.SPAWN_RADIUS);
+      for (let i = 0; i < ENEMY_CONFIG.MAX_COUNT; i++) {
+        const enemy = createEnemy(i, ENEMY_CONFIG.MAX_COUNT, ENEMY_CONFIG.SPAWN_RADIUS);
         scene.add(enemy);
         enemies.push(enemy);
       }
@@ -91,7 +85,7 @@ const GameScreen = () => {
   };
 
   const startRenderLoop = () => {
-    let frameCount = 0;
+    // let frameCount = 0;
     
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -110,15 +104,14 @@ const GameScreen = () => {
         }
         
         // Log toutes les 60 frames
-        frameCount++;
-        if (frameCount % 60 === 0) {
-          console.log('Rendering frame', frameCount);
-        }
+        // frameCount++;
+        // if (frameCount % 60 === 0) {
+        //   console.log('Rendering frame', frameCount);
+        // }
       } catch (error) {
         console.error('Error in render loop:', error);
       }
     };
-    
     animate();
   };
 
@@ -127,16 +120,14 @@ const fadeAnim = useRef(new Animated.Value(0)).current; // initial opacity = 0
 const showResultMessage = (message) => {
   setGameState(prev => ({ ...prev, resultMessage: message }));
 
-  // Reset opacity to 1
   fadeAnim.setValue(1);
 
-  // Lance une animation qui fait disparaitre le message en 3 secondes
   Animated.timing(fadeAnim, {
     toValue: 0,
     duration: 3000,
     useNativeDriver: true,
   }).start(() => {
-    // Utiliser un délai pour sortir du cycle de rendu actuel
+
     setTimeout(() => {
       setGameState(prev => ({ ...prev, resultMessage: '' }));
     }, 0);
@@ -155,7 +146,7 @@ const showResultMessage = (message) => {
     setGameState(prev => ({ ...prev, resultMessage: '' }));
 
     try {
-      const enemyId = Math.floor(Math.random() * GAME_CONFIG.ENEMIES.MAX_COUNT);
+      const enemyId = Math.floor(Math.random() * ENEMY_CONFIG.MAX_COUNT);
       const attackType = gameLogic.current.getRandomAttack();
       
       console.log(`Enemy ${enemyId} attacks with ${attackType}`);
@@ -167,7 +158,7 @@ const showResultMessage = (message) => {
         // Mettre à jour l'action attendue dans l'UI
         setGameState(prev => ({
           ...prev,
-          expectedAction: gameLogic.current.expectedAction
+          expectedActions: gameLogic.current.expectedActions
         }));
         
         // Timeout après 4 secondes
@@ -241,7 +232,7 @@ const showResultMessage = (message) => {
     resetAllEnemies();
     updateGameState(result.points);
 
-  showResultMessage(result.message);
+    showResultMessage(result.message);
     
     // Vérifier si game over
     if (gameState.health <= 0) {
@@ -306,8 +297,6 @@ const styles = StyleSheet.create({
   },
   glView: {
     flex: 1,
-    borderWidth: 2,
-    borderColor: 'red'
   },
 });
 

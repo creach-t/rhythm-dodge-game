@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GAME_CONFIG } from '../utils/Constants';
+import { PLAYER_CONFIG, CAMERA_CONFIG, COLORS } from '../utils/Constants';
 
 export const setupScene = () => {
   const scene = new THREE.Scene();
@@ -9,23 +9,23 @@ export const setupScene = () => {
 
 export const setupCamera = (width, height) => {
   const camera = new THREE.PerspectiveCamera(
-    GAME_CONFIG.CAMERA.FOV,
+    CAMERA_CONFIG.FOV,
     width / height,
-    GAME_CONFIG.CAMERA.NEAR,
-    GAME_CONFIG.CAMERA.FAR
+    CAMERA_CONFIG.NEAR,
+    CAMERA_CONFIG.FAR
   );
   
   camera.position.set(
-    GAME_CONFIG.CAMERA.POSITION.x,
-    GAME_CONFIG.CAMERA.POSITION.y,
-    GAME_CONFIG.CAMERA.POSITION.z
+    CAMERA_CONFIG.POSITION.x,
+    CAMERA_CONFIG.POSITION.y,
+    CAMERA_CONFIG.POSITION.z
   );
   
   camera.lookAt(
     new THREE.Vector3(
-      GAME_CONFIG.CAMERA.LOOK_AT.x,
-      GAME_CONFIG.CAMERA.LOOK_AT.y,
-      GAME_CONFIG.CAMERA.LOOK_AT.z
+      CAMERA_CONFIG.LOOK_AT.x,
+      CAMERA_CONFIG.LOOK_AT.y,
+      CAMERA_CONFIG.LOOK_AT.z
     )
   );
   
@@ -52,7 +52,7 @@ export const setupLighting = (scene) => {
 export const createGround = () => {
   const groundGeometry = new THREE.CircleGeometry(15, 32);
   const groundMaterial = new THREE.MeshPhongMaterial({ 
-    color: 0x33ee11,
+    color: COLORS.GROUND,
     emissive: 0x111111,
     shininess: 10
   });
@@ -74,9 +74,9 @@ export const createGrid = () => {
 
 export const createPlayer = () => {
   const playerGeometry = new THREE.BoxGeometry(
-    GAME_CONFIG.PLAYER.SIZE,
-    GAME_CONFIG.PLAYER.SIZE * 1.5,
-    GAME_CONFIG.PLAYER.SIZE
+    PLAYER_CONFIG.SIZE,
+    PLAYER_CONFIG.SIZE * 2.5,
+    PLAYER_CONFIG.SIZE
   );
   const playerMaterial = new THREE.MeshPhongMaterial({ 
     color: 0x4ecdc4,
@@ -85,9 +85,9 @@ export const createPlayer = () => {
   });
   const player = new THREE.Mesh(playerGeometry, playerMaterial);
   player.position.set(
-    GAME_CONFIG.PLAYER.POSITION.x,
-    GAME_CONFIG.PLAYER.SIZE * 0.50,
-    GAME_CONFIG.PLAYER.POSITION.z
+    PLAYER_CONFIG.POSITION.x,
+    PLAYER_CONFIG.SIZE * 0.50,
+    PLAYER_CONFIG.POSITION.z
   );
   player.castShadow = true;
   player.name = 'player';

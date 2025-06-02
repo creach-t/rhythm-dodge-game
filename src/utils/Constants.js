@@ -43,7 +43,7 @@ export const COLORS = {
   
   // Game Object Colors
   PLAYER: '#4ecdc4',
-  GROUND: '#2a2a2a',
+  GROUND: '#331133',
   GRID: '#404040',
   
   // Enemy Colors (hex values for THREE.js)
@@ -51,9 +51,9 @@ export const COLORS = {
   ENEMY_VARIANTS: [0xD3D3D3, 0xD3D3D3, 0xD3D3D3, 0xD3D3D3],
   
   // Attack Highlight Colors
-  ATTACK_NORMAL: 0xffd93d,  // Yellow for dodge
-  ATTACK_HEAVY: 0x45b7d1,   // Blue for parry
-  ATTACK_FEINT: 0xff6b6b    // Red for feint
+  ATTACK: { normal: '#ffff00',  // Yellow for dodge
+            heavy: '#ffff00',   // Blue for parry
+            feint: '#ffff00' }   // Red for feint
 };
 
 // Button Configuration
@@ -156,8 +156,8 @@ export const TIMING_CONFIG = {
   TARGET_FPS: 60,
   
   // Action Windows (in milliseconds)
-  PERFECT_WINDOW: 100,      // Perfect timing window
-  GOOD_WINDOW: 250,         // Good timing window
+  PERFECT_WINDOW: 1000,      // Perfect timing window
+  GOOD_WINDOW: 2500,         // Good timing window
   TOTAL_ACTION_WINDOW: 4000, // Total time player has to react
   
   // Attack Timing
@@ -176,8 +176,8 @@ export const TIMING_CONFIG = {
 
 // Score System
 export const SCORE_CONFIG = {
-  PERFECT_HIT: 100,
-  GOOD_HIT: 50,
+  PERFECT_HIT: 1000,
+  GOOD_HIT: 5000,
   MISS_PENALTY: 0,
   WRONG_ACTION_PENALTY: 0,
   ROUND_COMPLETION_BONUS: 50,
@@ -287,17 +287,6 @@ export const DEBUG_CONFIG = {
 // ============================================================================
 // LEGACY COMPATIBILITY (to be removed after refactoring)
 // ============================================================================
-
-// Maintain backward compatibility during refactoring
-export const GAME_CONFIG = {
-  TARGET_FPS: TIMING_CONFIG.TARGET_FPS,
-  CAMERA: CAMERA_CONFIG,
-  PLAYER: PLAYER_CONFIG,
-  ENEMIES: ENEMY_CONFIG,
-  TIMING: TIMING_CONFIG,
-  SCORE: SCORE_CONFIG,
-  ATTACK_SEQUENCE_1: ATTACK_SEQUENCES.BASIC
-};
 
 export const TIMING = TIMING_CONFIG;
 export const BUTTON_CONFIG_LEGACY = BUTTON_CONFIG;

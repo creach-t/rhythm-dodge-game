@@ -1,4 +1,4 @@
-import { DEFENSE_ACTIONS } from './EnemySystem';
+import { DEFENSE_ACTIONS } from '../utils/Constants.js';
 
 export class GameLogic {
   constructor() {
@@ -11,28 +11,27 @@ export class GameLogic {
   }
 
   triggerAttack(enemyId, attackType) {
-    if (this.awaitingAction) return false;
+    this.awaitingAction = true;
+    this.currentEnemyId = enemyId;
+    this.currentAttackType = attackType;
 
-    // Déterminer l'action attendue selon le type d'attaque
     switch (attackType) {
       case 'normal':
-        this.expectedAction = DEFENSE_ACTIONS.DODGE;
-        break;
       case 'heavy':
-        this.expectedAction = DEFENSE_ACTIONS.PARRY;
+        this.expectedActions = [DEFENSE_ACTIONS.DODGE, DEFENSE_ACTIONS.PARRY];
         break;
       case 'feint':
-        this.expectedAction = DEFENSE_ACTIONS.NONE;
+        this.expectedActions = [DEFENSE_ACTIONS.NONE];
         break;
       default:
+        console.warn(`Unknown attack type: ${attackType}`);
+        this.expectedActions = [];
         return false;
     }
 
-    this.awaitingAction = true;
-    this.attackStartTime = Date.now();
-    
     return true;
   }
+
 
     playerTurn(playerChoice) {
     // playerChoice est un objet { action: 'attack'|'heal', targetId? }
