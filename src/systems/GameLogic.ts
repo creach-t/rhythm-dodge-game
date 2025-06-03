@@ -1,52 +1,81 @@
-import { 
-  DEFENSE_ACTIONS, 
+import {
   ATTACK_TYPES,
   DAMAGE_CONFIG,
+  DEFENSE_ACTIONS,
+  ENEMY_CONFIG,
+  PLAYER_CONFIG,
+  SCORE_CONFIG,
   SUCCESS_RATES,
-  SCORE_CONFIG
-} from '../utils/Constants.js';
+} from '../utils/Constants';
 
 export class GameLogic {
+  currentRound: number;
+  awaitingAction: boolean;
+  currentAttackType: keyof typeof ATTACK_TYPES | null;
+  currentEnemyId: number | null;
+  attackStartTime: number;
+  playerHealth: number;
+  enemyHealths: number[];
+
   constructor() {
     this.currentRound = 1;
     this.awaitingAction = false;
     this.currentAttackType = null;
     this.currentEnemyId = null;
     this.attackStartTime = 0;
-    this.playerHealth = 100;
-    this.enemyHealths = [100, 100, 100]; // Santé pour chaque ennemi
+    this.playerHealth = PLAYER_CONFIG.HEALTH;
+    this.enemyHealths = Array(ENEMY_CONFIG.MAX_COUNT).fill(ENEMY_CONFIG.HEALTH);
   }
 
-  /**
-   * Déclenche une attaque ennemie
-   */
-  triggerAttack(enemyId, attackType) {
+  triggerAttack(
+    enemyId: number,
+    attackType: keyof typeof ATTACK_TYPES,
+  ): boolean {
     this.awaitingAction = true;
     this.currentEnemyId = enemyId;
     this.currentAttackType = attackType;
     this.attackStartTime = Date.now();
-
     console.log(`Enemy ${enemyId} announces ${attackType} attack!`);
     return true;
   }
 
-  /**
-   * Vérifie l'action du joueur et calcule les résultats
-   */
-  checkPlayerAction(action) {
+  resetAll() {
+    this.currentRound = 1;
+    this.awaitingAction = false;
+    this.currentAttackType = null;
+    this.currentEnemyId = null;
+    this.attackStartTime = 0;
+    this.playerHealth = PLAYER_CONFIG.HEALTH;
+    this.enemyHealths = Array(ENEMY_CONFIG.MAX_COUNT).fill(ENEMY_CONFIG.HEALTH);
+  }
+
+  checkPlayerAction(action: keyof typeof DEFENSE_ACTIONS): {
+    success: boolean;
+    damage: number;
+    counterAttack: boolean;
+    points: number;
+    message: string;
+    isCorrect: boolean;
+  } | null {
     if (!this.awaitingAction) return null;
 
-    const timeTaken = Date.now() - this.attackStartTime;
+    // 🔍 DEBUGGING - Ajoutez ces lignes
+    console.log('currentAttackType:', this.currentAttackType);
+    console.log('ATTACK_TYPES:', ATTACK_TYPES);
+    console.log('Comparison results:');
+    console.log('NORMAL:', this.currentAttackType === ATTACK_TYPES.NORMAL);
+    console.log('HEAVY:', this.currentAttackType === ATTACK_TYPES.HEAVY);
+    console.log('FEINT:', this.currentAttackType === ATTACK_TYPES.FEINT);
+
     let result = {
       success: false,
       damage: 0,
       counterAttack: false,
       points: 0,
       message: '',
-      isCorrect: false
+      isCorrect: false,
     };
 
-    // Traiter selon le type d'attaque
     switch (this.currentAttackType) {
       case ATTACK_TYPES.NORMAL:
         result = this.handleNormalAttack(action);
@@ -57,162 +86,172 @@ export class GameLogic {
       case ATTACK_TYPES.FEINT:
         result = this.handleFeintAttack(action);
         break;
+      default:
+        result.message = 'Attaque inconnue !';
+        break;
     }
 
-    // Réinitialiser l'état
-    this.reset();
-
+    this.awaitingAction = false;
+    if (result.damage > 0) {
+      this.playerHealth = Math.max(0, this.playerHealth - result.damage);
+    }
     return result;
   }
 
-  /**
-   * Gère une attaque normale (-20 PV)
-   */
-  handleNormalAttack(action) {
-    let result = {
+  private handleNormalAttack(action: keyof typeof DEFENSE_ACTIONS): {
+    success: boolean;
+    damage: number;
+    counterAttack: boolean;
+    points: number;
+    message: string;
+    isCorrect: boolean;
+  } {
+    const result = {
       success: false,
       damage: 0,
       counterAttack: false,
       points: 0,
-      message: ''
+      message: '',
+      isCorrect: false,
     };
 
     if (action === DEFENSE_ACTIONS.DODGE) {
-      // Esquive - faible risque
       if (Math.random() < SUCCESS_RATES.DODGE) {
         result.success = true;
         result.points = SCORE_CONFIG.DODGE_SUCCESS;
         result.message = 'Esquive réussie !';
+        result.isCorrect = true;
       } else {
         result.damage = DAMAGE_CONFIG.NORMAL_ATTACK;
         result.points = SCORE_CONFIG.MISS_PENALTY;
         result.message = 'Esquive ratée !';
+        result.isCorrect = false;
       }
     } else if (action === DEFENSE_ACTIONS.PARRY) {
-      // Parade - haut risque mais contre-attaque si réussie
       if (Math.random() < SUCCESS_RATES.PARRY) {
         result.success = true;
         result.counterAttack = true;
         result.points = SCORE_CONFIG.PARRY_SUCCESS + SCORE_CONFIG.COUNTER_BONUS;
         result.message = 'Parade parfaite ! Contre-attaque !';
-        
-        // Infliger des dégâts à l'ennemi
-        this.damageEnemy(this.currentEnemyId, DAMAGE_CONFIG.COUNTER_DAMAGE);
+        result.isCorrect = true;
+        this.damageEnemy(
+          this.currentEnemyId as number,
+          DAMAGE_CONFIG.COUNTER_DAMAGE,
+        );
       } else {
         result.damage = DAMAGE_CONFIG.NORMAL_ATTACK;
         result.points = SCORE_CONFIG.MISS_PENALTY;
         result.message = 'Parade ratée !';
+        result.isCorrect = false;
       }
     } else {
-      // Aucune action ou mauvaise action
       result.damage = DAMAGE_CONFIG.NORMAL_ATTACK;
       result.points = SCORE_CONFIG.MISS_PENALTY;
-      result.message = 'Touché !';
+      result.message = 'Mauvaise action !';
+      result.isCorrect = false;
     }
-
     return result;
   }
 
-  /**
-   * Gère une attaque lourde (-50 PV)
-   */
-  handleHeavyAttack(action) {
-    let result = {
+  private handleHeavyAttack(action: keyof typeof DEFENSE_ACTIONS): {
+    success: boolean;
+    damage: number;
+    counterAttack: boolean;
+    points: number;
+    message: string;
+    isCorrect: boolean;
+  } {
+    const result = {
       success: false,
       damage: 0,
       counterAttack: false,
       points: 0,
-      message: ''
+      message: '',
+      isCorrect: false,
     };
 
     if (action === DEFENSE_ACTIONS.DODGE) {
-      // Esquive - faible risque
       if (Math.random() < SUCCESS_RATES.DODGE) {
         result.success = true;
         result.points = SCORE_CONFIG.DODGE_SUCCESS;
         result.message = 'Esquive réussie !';
+        result.isCorrect = true;
       } else {
         result.damage = DAMAGE_CONFIG.HEAVY_ATTACK;
         result.points = SCORE_CONFIG.MISS_PENALTY;
         result.message = 'Esquive ratée ! Gros dégâts !';
+        result.isCorrect = false;
       }
     } else if (action === DEFENSE_ACTIONS.PARRY) {
-      // Parade - haut risque mais contre-attaque si réussie
       if (Math.random() < SUCCESS_RATES.PARRY) {
         result.success = true;
         result.counterAttack = true;
         result.points = SCORE_CONFIG.PARRY_SUCCESS + SCORE_CONFIG.COUNTER_BONUS;
         result.message = 'Parade héroïque ! Contre-attaque !';
-        
-        // Infliger des dégâts à l'ennemi
-        this.damageEnemy(this.currentEnemyId, DAMAGE_CONFIG.COUNTER_DAMAGE);
+        result.isCorrect = true;
+        this.damageEnemy(
+          this.currentEnemyId as number,
+          DAMAGE_CONFIG.COUNTER_DAMAGE,
+        );
       } else {
         result.damage = DAMAGE_CONFIG.HEAVY_ATTACK;
         result.points = SCORE_CONFIG.MISS_PENALTY;
-        result.message = 'Parade ratée ! Dégâts critiques !';
+        result.message = 'Parade ratée ! Gros dégâts !';
+        result.isCorrect = false;
       }
     } else {
-      // Aucune action ou mauvaise action
       result.damage = DAMAGE_CONFIG.HEAVY_ATTACK;
       result.points = SCORE_CONFIG.MISS_PENALTY;
-      result.message = 'Coup dévastateur !';
+      result.message = 'Mauvaise action ! Gros dégâts !';
+      result.isCorrect = false;
     }
-
     return result;
   }
 
-  /**
-   * Gère une feinte (piège - ne rien faire)
-   */
-  handleFeintAttack(action) {
-    let result = {
+  private handleFeintAttack(action: keyof typeof DEFENSE_ACTIONS): {
+    success: boolean;
+    damage: number;
+    counterAttack: boolean;
+    points: number;
+    message: string;
+    isCorrect: boolean;
+  } {
+    const result = {
       success: false,
       damage: 0,
       counterAttack: false,
       points: 0,
-      message: ''
+      message: '',
+      isCorrect: false,
     };
 
     if (action === DEFENSE_ACTIONS.NONE) {
-      // Bonne réaction - ne rien faire
       result.success = true;
       result.points = SCORE_CONFIG.FEINT_SUCCESS;
       result.message = 'Feinte évitée !';
+      result.isCorrect = true;
     } else {
-      // Le joueur est tombé dans le piège
       result.damage = DAMAGE_CONFIG.FEINT_PENALTY;
       result.points = SCORE_CONFIG.MISS_PENALTY;
       result.message = 'Piégé par la feinte !';
+      result.isCorrect = false;
     }
-
     return result;
   }
 
-  /**
-   * Inflige des dégâts à un ennemi
-   */
-  damageEnemy(enemyId, damage) {
+  damageEnemy(enemyId: number, damage: number): void {
     if (enemyId >= 0 && enemyId < this.enemyHealths.length) {
-      this.enemyHealths[enemyId] = Math.max(0, this.enemyHealths[enemyId] - damage);
-      console.log(`Enemy ${enemyId} takes ${damage} damage! Health: ${this.enemyHealths[enemyId]}`);
+      this.enemyHealths[enemyId] = Math.max(
+        0,
+        this.enemyHealths[enemyId] - damage,
+      );
+      console.log(
+        `Enemy ${enemyId} takes ${damage} damage! Health: ${this.enemyHealths[enemyId]}`,
+      );
     }
   }
 
-  /**
-   * Vérifie si l'action était à temps (non utilisé mais peut être utile)
-   */
-  checkActionTiming() {
-    const timeTaken = Date.now() - this.attackStartTime;
-    if (timeTaken > 2000) {
-      return { damage: this.getDamageForAttack(), message: 'Trop lent !' };
-    }
-    return null;
-  }
-
-  /**
-   * Retourne les dégâts pour l'attaque actuelle
-   */
-  getDamageForAttack() {
+  getDamageForAttack(): number {
     switch (this.currentAttackType) {
       case ATTACK_TYPES.NORMAL:
         return DAMAGE_CONFIG.NORMAL_ATTACK;
@@ -223,35 +262,23 @@ export class GameLogic {
     }
   }
 
-  /**
-   * Réinitialise l'état après une action
-   */
-  reset() {
+  reset(): void {
     this.awaitingAction = false;
     this.currentAttackType = null;
     this.currentEnemyId = null;
     this.attackStartTime = 0;
   }
 
-  /**
-   * Génère une attaque aléatoire
-   */
-  getRandomAttack() {
-    const attacks = Object.values(ATTACK_TYPES);
+  getRandomAttack(): keyof typeof ATTACK_TYPES {
+    const attacks = Object.keys(ATTACK_TYPES) as (keyof typeof ATTACK_TYPES)[];
     return attacks[Math.floor(Math.random() * attacks.length)];
   }
 
-  /**
-   * Obtient la santé d'un ennemi
-   */
-  getEnemyHealth(enemyId) {
-    return this.enemyHealths[enemyId] || 0;
+  getEnemyHealth(enemyId: number): number {
+    return this.enemyHealths[enemyId];
   }
 
-  /**
-   * Vérifie si tous les ennemis sont vaincus
-   */
-  areAllEnemiesDefeated() {
-    return this.enemyHealths.every(health => health <= 0);
+  areAllEnemiesDefeated(): boolean {
+    return this.enemyHealths.every((health: number) => health <= 0);
   }
 }
